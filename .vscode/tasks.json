@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build: local snapshot",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/validate.sh", "--build-only"],
+      "windows": {
+        "command": "powershell.exe",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/validate.ps1", "-BuildOnly"]
+      },
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": {"kind": "build", "isDefault": true},
+      "problemMatcher": []
+    },
+    {
+      "label": "validate",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/validate.sh"],
+      "windows": {
+        "command": "powershell.exe",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/validate.ps1"]
+      },
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "validate: race",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/validate.sh", "--race"],
+      "windows": {
+        "command": "powershell.exe",
+        "args": ["-NoProfile", "-File", "${workspaceFolder}/scripts/validate.ps1", "-Race"]
+      },
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+name: Copy to GitHub
+
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+  workflow_dispatch:
+
+# Keep all branch and tag copies in one queue.
+concurrency:
+  group: github-public-copy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Allocate a fresh checkout
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_path="$(mktemp -d "$GITHUB_WORKSPACE/mirror-source.XXXXXXXX")"
+          printf 'path=%s\n' "$source_path" >> "$GITHUB_OUTPUT"
+
+      - name: Check out all source branches and tags
+        uses: https://github.com/actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: ${{ steps.source.outputs.path }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+          submodules: false
+
+      - name: Copy branches and tags
+        shell: bash
+        working-directory: ${{ steps.source.outputs.path }}
+        env:
+          GH_MIRROR_SSH_KEY: ${{ secrets.GH_MIRROR_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [[ -z "$GH_MIRROR_SSH_KEY" ]]; then
+            printf '%s\n' 'Missing repository secret GH_MIRROR_SSH_KEY.' >&2
+            exit 1
+          fi
+
+          umask 077
+          key_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/github-mirror.XXXXXXXX")"
+          trap 'rm -rf -- "$key_dir"' EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          printf '%s\n' "$GH_MIRROR_SSH_KEY" > "$key_dir/key"
+          unset GH_MIRROR_SSH_KEY
+          chmod 600 "$key_dir/key"
+          # Published by https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$key_dir/known_hosts"
+          cat > "$key_dir/ssh" <<'SSH'
+          #!/usr/bin/env bash
+          exec ssh -F /dev/null -i "$MIRROR_KEY_DIR/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$MIRROR_KEY_DIR/known_hosts" -o GlobalKnownHostsFile=/dev/null -o HostKeyAlgorithms=ssh-ed25519 -o ConnectTimeout=20 "$@"
+          SSH
+          chmod 700 "$key_dir/ssh"
+          export MIRROR_KEY_DIR="$key_dir"
+          export GIT_SSH="$key_dir/ssh"
+          export GIT_SSH_VARIANT=ssh
+          unset GIT_SSH_COMMAND
+          export GIT_TERMINAL_PROMPT=0
+
+          refspecs=()
+          while IFS= read -r source_ref; do
+            [[ "$source_ref" == refs/remotes/origin/HEAD ]] && continue
+            # Symbolic remote refs are aliases, not source branches.
+            if git symbolic-ref -q "$source_ref" >/dev/null 2>&1; then
+              continue
+            fi
+            branch="${source_ref#refs/remotes/origin/}"
+            refspecs+=("$source_ref:refs/heads/$branch")
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin/)
+          while IFS= read -r source_ref; do
+            refspecs+=("$source_ref:$source_ref")
+          done < <(git for-each-ref --format='%(refname)' refs/tags/)
+
+          if (( ${#refspecs[@]} == 0 )); then
+            printf '%s\n' 'No source branches or tags were found.' >&2
+            exit 1
+          fi
+          # An atomic, ordinary push rejects divergent branches and changed tags.
+          git -c core.hooksPath=/dev/null push --atomic --porcelain -- \
+            git@github.com:marcuoli/go-versioning.git "${refspecs[@]}"
