@@ -2,6 +2,7 @@
 
 ## v0.1.0
 
+- **Source PR #2:** Configure optional certificate trust for Gitea validation and GitHub copying while keeping certificate details outside tracked content.
 - Add application version parsing, core inheritance and explicit version bumps.
 - Resolve injected and embedded build identity without implicit Git discovery.
 - Inspect explicit Git repositories and plan immutable date/PR application tags.
