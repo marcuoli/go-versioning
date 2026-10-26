@@ -5,10 +5,17 @@ The Gitea repository is the source of truth. The public copy is
 Make changes in Gitea and let `.gitea/workflows/mirror-github.yml` copy branches
 and tags to GitHub. Treat the GitHub repository as a distribution copy.
 
-## Setup
+## Existing-mirror configuration
 
-1. Create the empty public GitHub repository without an initial README, license,
-   or `.gitignore` commit. Publish only material approved for public distribution.
+This repository's public copy is already bootstrapped. The current workflow
+requires the exact historical `v0.1.0` identities documented below, including
+the destination's existing lightweight tag. An empty replacement repository
+will fail before any ref update. Restore approved historical refs through a
+deliberate recovery procedure before enabling this workflow on a recreated
+copy; do not remove the guard to bypass missing history.
+
+1. Use the existing public GitHub repository with its recorded immutable
+   historical refs. Publish only material approved for public distribution.
 2. Generate a dedicated SSH key pair for this repository. Add its public key as a
    GitHub deploy key with **Allow write access** enabled. Do not reuse an account
    SSH key or give Gitea a broad GitHub access token.
