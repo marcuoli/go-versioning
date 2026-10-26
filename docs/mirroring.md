@@ -28,6 +28,17 @@ The checkout action is pinned to the verified `actions/checkout` v4.2.2 commit
 all branches and tags into a fresh directory. Source authentication uses the
 Gitea job context; the GitHub deploy key is available only to the copy step.
 
+If the runner does not already trust the source HTTPS certificate issuer, add the
+repository Actions secret `SOURCE_CA_PEM` with the required PEM CA certificates
+from an independently verified trust chain. Both Gitea workflows optionally
+combine those certificates with the runner's existing system CA bundle before
+checkout. Git and Node.js use the temporary mode-600 bundle, which an always-run
+cleanup step removes afterward. Certificate and hostname verification stay
+enabled. Without the secret, the workflows keep their normal system trust
+settings. Keep source certificate details and infrastructure addresses out of
+tracked files. Hard runner termination can prevent cleanup, so use disposable or
+appropriately cleaned runner storage.
+
 ## Copy behavior
 
 Every branch or tag push requests a copy. One concurrency group serializes all

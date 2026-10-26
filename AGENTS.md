@@ -21,6 +21,8 @@ This is an importable Go library with optional Git integration and a CLI.
 ## Change management
 - For ongoing work, use typed imperative issue titles: feat, fix, docs, refactor,
   test, build, security or chore, with one matching `type:*` label and accurate `area:*` labels.
+- Supported areas: `area:versioning`, `area:git`, `area:cli`, `area:tooling`,
+  `area:documentation`, `area:release`, and `area:security`.
 - Include `## Validation and acceptance` and concrete Markdown checkboxes in each issue.
   Record evidence before checking an outcome or closing an issue.
 - Use `codex/<type>/<issue>-<description>` for agent branches (`feature` for feat).

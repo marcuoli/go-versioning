@@ -12,6 +12,12 @@ regression tests, documentation and a newest-first `CHANGELOG.md` entry on
 the pull-request branch. Preserve unrelated code, comments, tests and local
 changes. Never infer publication from passing local tests.
 
+## Classification
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `security`, `chore`.
+Areas: `area:versioning`, `area:git`, `area:cli`, `area:tooling`,
+`area:documentation`, `area:release`, `area:security`.
+
 ## Validation and builds
 Use Go 1.27.3 and the shared scripts for tests, vet, module verification and
 CGO-disabled CLI builds. Run race tests with an existing C compiler when the
