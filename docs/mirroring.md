@@ -5,10 +5,17 @@ The Gitea repository is the source of truth. The public copy is
 Make changes in Gitea and let `.gitea/workflows/mirror-github.yml` copy branches
 and tags to GitHub. Treat the GitHub repository as a distribution copy.
 
-## Setup
+## Existing-mirror configuration
 
-1. Create the empty public GitHub repository without an initial README, license,
-   or `.gitignore` commit. Publish only material approved for public distribution.
+This repository's public copy is already bootstrapped. The current workflow
+requires the exact historical `v0.1.0` identities documented below, including
+the destination's existing lightweight tag. An empty replacement repository
+will fail before any ref update. Restore approved historical refs through a
+deliberate recovery procedure before enabling this workflow on a recreated
+copy; do not remove the guard to bypass missing history.
+
+1. Use the existing public GitHub repository with its recorded immutable
+   historical refs. Publish only material approved for public distribution.
 2. Generate a dedicated SSH key pair for this repository. Add its public key as a
    GitHub deploy key with **Allow write access** enabled. Do not reuse an account
    SSH key or give Gitea a broad GitHub access token.
@@ -25,8 +32,10 @@ and tags to GitHub. Treat the GitHub repository as a distribution copy.
 
 The checkout action is pinned to the verified `actions/checkout` v4.2.2 commit
 `11bd71901bbe5b1630ceea73d27597364c9af683`. It checks out complete history and
-all branches and tags into a fresh directory. Source authentication uses the
-Gitea job context; the GitHub deploy key is available only to the copy step.
+all branches and tags into a fresh directory and explicitly checks out `main`.
+This avoids replacing an annotated tag ref with a tag event's peeled commit SHA.
+Source authentication uses the Gitea job context; the GitHub deploy key is
+available only to the copy step.
 
 If the runner does not already trust the source HTTPS certificate issuer, add the
 repository Actions secret `SOURCE_CA_PEM` with the required PEM CA certificates
@@ -61,6 +70,20 @@ operator deliberately reconciles it. GitHub protection rules can also reject a
 copy. Resolve conflicts explicitly after checking the source of truth, then run
 the workflow again. Do not automatically force or delete refs to clear a failure.
 
+The already-published `v0.1.0` has one frozen historical exception. Its source
+annotated tag object is `71d1b1e9fd62f5f25e425746370a8af074b0e122`, targeting
+commit `71b1ece94d0b85eec80cb794bdb72d14272bc951`; GitHub's existing lightweight
+`v0.1.0` ref points directly to that same commit. The initial tag-event checkout
+lost the annotation before copying. Both published refs remain immutable.
+
+The workflow logs retention and omits only that tag from its push when the local
+source tag object, local peeled commit, and GitHub direct ref exactly match
+those identities. This permits later branch and tag copies without replacing
+`v0.1.0`. A different or missing source tag, source commit, or destination ref
+fails closed before any branch or tag is pushed. All other tag conflicts still
+reject the atomic push, even when two different tag objects refer to the same
+commit. Future annotated tags retain their exact source tag object IDs on GitHub.
+
 The SSH key is written to a temporary mode-600 file and removed by an exit trap.
 The SSH connection uses a pinned GitHub Ed25519 host key and strict host checking;
 it does not trust keys discovered at runtime. If GitHub rotates that host key,
@@ -70,8 +93,8 @@ appropriately cleaned runner storage.
 
 A green local test does not prove copying works. Acceptance requires a successful
 Gitea Actions run with the configured secret and matching branch/tag object IDs
-on GitHub. The workflow cannot execute until its repository secret and runner
-are available.
+on GitHub, apart from the frozen historical `v0.1.0` exception above.
+The workflow cannot execute until its repository secret and runner are available.
 
 ## References
 

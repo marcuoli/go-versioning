@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.1
+
+- **Source PR #3:** Preserve annotated release tags during public copying, retain the documented v0.1.0 historical refs, and pin current consumer examples.
+
 ## v0.1.0
 
 - **Source PR #2:** Configure optional certificate trust for Gitea validation and GitHub copying, and allow manual public-copy CI validation while keeping certificate details outside tracked content.
