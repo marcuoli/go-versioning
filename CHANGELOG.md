@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0+20261105.9
+
+- **Source PR #9, issue #8:** Manage the overall build number in a locked, atomically replaced external `VERSION`; add explicit evidence-backed seed/migration APIs and CLI, one-time complete canonical HEAD commit fallback, and preserved legacy receipts/retries.
+- Keep application/release identity distinct; update shared policy and skill with legacy-first investigation and continuity semantics.
+
 ## 0.2.0+20261105.7
 
 - **Source PR #7, issue #6:** Add explicit persistent build-attempt counters, authority provenance, retry/failure semantics and shared validated linker metadata without runtime allocation.

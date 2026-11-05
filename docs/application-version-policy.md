@@ -100,6 +100,23 @@ dependency coordinates. A new module coordinate requires its own reviewed releas
 policy and authorization; this guidance does not create a bare `vCORE` alias,
 publish anything, or replace the full displayed app/release identity.
 
+## Overall build-number continuity
+
+Keep `CORE+YYYYMMDD.PR` separate from the overall build number. The shared allocator
+manages the latter as a one-line numeric `VERSION` inside one external authority.
+Before initialization, inspect existing VERSION/build files, history, scripts and
+hooks and preserve the verified prior sequence/value with evidence. If none exists,
+the explicitly approved fallback is the one-time total unique commits reachable
+from the recorded canonical integration HEAD in complete, non-shallow history.
+Never use unrelated `--all` history or recalculate it for each build. This seed
+provides continuity; it does not count historical compilation attempts.
+
+Use the explicit seed/migration API/CLI in [build counters](build-counters.md).
+Migration accounts for all attempts present under lock and preserves old receipts,
+allocation retries and artifacts. Inspect VERSION files holding full release
+identities deliberately before adopting the numeric-file contract. A checkout's
+release identity must remain complete and distinct from the authority's counter.
+
 ## Shared Codex guidance
 
 The source-controlled [go-versioning skill](../skills/go-versioning/SKILL.md)

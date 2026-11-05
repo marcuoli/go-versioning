@@ -2,9 +2,16 @@
 
 An overall build number is a reservation for one logical build invocation in one
 explicitly initialized application authority. It is independent of the complete
-`CORE+YYYYMMDD.PR` release identity. No PR number, commit count, dependency version
-or inferred historical baseline is used. The first reservation is 1: the first
-tracked attempt in this authority, not a claim about earlier application builds.
+`CORE+YYYYMMDD.PR` release identity. PR numbers and dependency versions are never overall build numbers. Before adoption,
+investigate Git history, legacy VERSION/build files, hooks and build/release scripts.
+Preserve a verified existing sequence/value and record its computation and semantics
+(including counters previously incremented on commits). Only when no existing method
+or value exists, use the explicitly approved one-time count of all unique commits
+reachable from the canonical integration HEAD in complete, non-shallow history.
+Record the exact HEAD, count, command, method and check time. This is a continuity
+baseline, not evidence of historical build attempts. Never use `--all`, a first-parent
+count or recompute commit counts during normal builds. A deliberately new sequence
+may still initialize at zero, with first reservation 1, for API compatibility.
 
 `Info.OverallBuildNumber` is uint64; zero means unknown.
 `Info.BuildCounterID` identifies the authority/epoch. A positive number requires
@@ -21,13 +28,23 @@ The CLI also requires an explicit repository and rejects source-local stores.
 Store permissions and access are the operator's responsibility; only trusted,
 cooperating builders may write it.
 
-The store contains immutable authority metadata, an append-only `issued.log`,
+New authorities use schema2 and `VERSION`: one canonical decimal line followed by
+LF, representing the current overall number. This file lives inside the single
+external authority, never in independent checkout/cloud-sync replicas. Its view is
+validated against the complete history and replaced under the same lock using a
+synced adjacent staging file and rename. Supported filesystems must provide atomic
+replacement/visibility; verify the actual filesystem. Direct edits are forbidden.
+
+The store contains authority metadata, an append-only `issued.log`,
 immutable numbered JSON reservations, and a temporary exclusive directory lock.
 All cooperating allocators use the same lock and validate the complete sequence
 and ledger before allocation. Issuance is synced before the reservation file;
 the complete reservation file is synced before success is acknowledged. This
 separate sequence detects a missing reservation tail rather than reusing a number.
-Canonical schema1 JSON rejects duplicate/unknown fields and ambiguous edits.
+Canonical JSON rejects duplicate/unknown fields and ambiguous edits. Schema1
+authorities remain readable/writable without automatic migration. Explicit migration
+upgrades their header to schema2; older library/CLI versions reject schema2 rather
+than ignoring VERSION or a baseline. Upgrade all builders before migration.
 Records are bounded; the ledger is never silently truncated to a prefix.
 
 Concurrency is supported across processes/checkouts using the **same live store**
@@ -47,6 +64,11 @@ File sync requests durability; ultimate power-loss behavior depends on the OS,
 filesystem and hardware. Preserve the whole store and external build journals.
 
 ## Attempts, failures and retries
+
+Allocate once before invoking the project-owned artifact build: compilation or an
+explicit release package/archive invocation. Imports and downstream dependency
+compilation do not allocate this project's number. Ordinary tests, startup,
+planning/version queries and tagging alone remain read-only.
 
 Allocate once before invoking the compiler. All targets/packages belonging to
 that logical invocation can embed the same reservation. This counts reserved
@@ -74,6 +96,76 @@ operator recovery. Remove an abandoned lock only after proving no writer owns it
 An incomplete ledger requires reconstruction from trustworthy reservation evidence
 or a deliberate new authority with its discontinuity disclosed; never delete an
 uncertain tail or restore an older active sequence merely to make allocation pass.
+
+## Explicit seed and migration
+
+Use `InitializeSeed(ctx, path, app, Seed)` for a new seeded authority, or
+`store.Migrate(ctx, Seed)` for an existing authority. A Seed contains `number`
+(uint64), `method` (`legacy` or `git-commits`), full `commit`, `command`, investigation
+`evidence` and RFC3339 `checked_time`. Evidence must establish the previous method
+and value, or its absence before choosing the Git fallback. API callers verify
+that evidence; the allocator cannot determine whether their investigation is true.
+`Repository.CommitCount(ctx, branch)` collects the Git fallback evidence, requires
+HEAD to match the designated canonical local integration branch and rejects shallow,
+grafted or untraversable history. The operator verifies that branch against its
+actual integration source; this command does not fetch or authenticate a host.
+
+Migration records an immutable baseline receipt, its SHA256 in the authority header,
+and the exact number of already tracked attempts observed under the authority lock.
+Current VERSION becomes `baseline + all tracked attempts`, including builds that
+arrived after preparation. For a synthetic baseline 70 and two existing attempts,
+VERSION becomes 72; the next new reservation is 73. Earlier receipt bytes, numbers,
+timestamps, request IDs and built artifacts remain unchanged. Retrying an old request
+returns its original metadata, even though that historical number differs from the
+new high-water. Do not recompile under an old allocation request ID.
+
+Only one baseline is accepted. Retrying the same seed returns current status without
+adding it again, including after later builds. Rechecking identical evidence with a
+later `checked_time` retains the original receipt/time; every other seed field must
+match. Status includes the original baseline evidence and tracked-attempt count.
+Overflow, missing VERSION/receipt, a changed receipt, conflicting evidence or an
+interrupted publication fails closed. Seeded initialization publishes its header only after the receipt and VERSION.
+Migration publishes a schema2 header binding the expected receipt first, so old
+and new writers reject any incomplete transaction. A crash between files is
+retained for deliberate recovery, never
+automatically adopted or repaired. Preserve the entire authority and stop/verify all
+writers before operator recovery. Never delete a receipt or reset a sequence.
+
+An existing VERSION containing a full release identity is not a numeric counter.
+Inspect and preserve it and its consumers deliberately before adoption. This CLI
+never overwrites a source checkout's VERSION. For a schema1 authority it admits an
+absent VERSION or the exact previous numeric high-water only; a conflicting number,
+release string or symlink fails without overwriting that file. A separate preserved
+release-identity file may be needed in the owning project's migration workflow.
+
+For a verified legacy baseline, create a reviewed seed JSON (synthetic values):
+
+```json
+{"number":70,"method":"legacy","commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","command":"inspect legacy VERSION history and increment hook","evidence":"verified value 70; hook incremented on commits","checked_time":"2026-11-05T20:00:00Z"}
+```
+
+```sh
+# Existing authority: accounts for every reservation under lock.
+go-versioning counter-migrate --repo /src/example-app \
+  --store /srv/build-data/example-app/counter --app example-app \
+  --seed-file /srv/build-data/example-app/legacy-seed.json --json
+
+# New authority: only after investigation found no existing method/value.
+go-versioning counter-init --repo /src/new-app \
+  --store /srv/build-data/new-app/counter --app new-app \
+  --seed-commits --branch main \
+  --evidence "history, VERSION/build files, scripts and hooks inspected; no prior sequence" --json
+
+go-versioning counter-status --repo /src/example-app \
+  --store /srv/build-data/example-app/counter --app example-app --json
+```
+
+`--seed-file` is the explicit legacy-evidence path. `--seed-commits` collects and
+persists the canonical HEAD/count/command/check time itself, requires investigation
+`--evidence`, and is also supported by `counter-migrate`. The two options are
+mutually exclusive. Save the returned status/receipt before preparing a retry.
+If HEAD or other seed evidence has changed, stop and inspect the existing baseline;
+never seed again from a newer count. All subsequent builds use only `build`/`Reserve`.
 
 ## CLI and shared metadata injection
 

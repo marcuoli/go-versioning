@@ -51,10 +51,28 @@ Keep any separately approved module-release coordinates explicit.
 
 ## Overall build counters
 
-Use the released shared `buildcounter` API/CLI for explicit build-time allocation,
-not a PR, commit count or dependency version. Initialize one external authority
-explicitly; no inferred historical baseline. Failed builds consume reservations;
-retries of the same allocation request retain their original number/time. A new
+Use the released shared `buildcounter` API/CLI for explicit build-time allocation.
+Use `VERSION` for the one-line current overall build number inside one external
+live authority, separate from `CORE+YYYYMMDD.PR`. Never hand-edit/reset it or create
+independent checkout/cloud-sync copies claiming one sequence.
+
+Before adoption, investigate Git history, legacy VERSION/build files, scripts and
+hooks for an existing build-number computation/value. Preserve its verified value
+and record semantics/evidence, even if the old method incremented on commits.
+Only if no existing method/value exists, the user-approved fallback is a ONE-TIME
+count of all unique commits reachable from the complete, non-shallow canonical
+integration HEAD. Record exact commit, count, command, method and check time; never
+use `--all`, first-parent counts or recompute on each build. This is continuity
+policy, not proof of historical build attempts.
+
+Use `counter-init --seed-file` / `InitializeSeed` for explicit legacy evidence, or
+`--seed-commits --branch main --evidence` for the investigated Git fallback. Existing
+authorities use `counter-migrate` / `Migrate`, never manual edits. The migration adds
+the baseline to all attempts observed under lock, preserving original reservations,
+retry numbers/timestamps and artifacts. Inspect existing VERSION release strings
+and migrate their consumers deliberately; never blindly overwrite them. Upgrade
+all builders: old allocators reject the migrated schema. Failed builds consume
+reservations; exact allocation retries retain their original number/time. A new
 compile invocation uses a new request ID. All cooperating checkouts/CI must use
 the same live store; cloud-sync/independent stores cannot claim one global order.
 Read the [counter contract](https://github.com/marcuoli/go-versioning/blob/main/docs/build-counters.md)

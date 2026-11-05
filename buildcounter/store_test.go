@@ -249,7 +249,7 @@ func TestDuplicateAuthorityKeysAreNotSilentlyDiscarded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = []byte(strings.Replace(string(data), `"schema":1`, `"schema":1,"schema":1`, 1))
+	data = []byte(strings.Replace(string(data), `"schema":2`, `"schema":1,"schema":1`, 1))
 	if err = os.WriteFile(file, data, 0600); err != nil {
 		t.Fatal(err)
 	}

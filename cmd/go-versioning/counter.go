@@ -34,13 +34,20 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var repoPath, storePath, app, id, version, commit, format, branch, bump, initial string
-	var release bool
+	var release, seedCommits bool
+	var seedFile, evidence string
 	var timeout time.Duration
 	fs.StringVar(&repoPath, "repo", "", "explicit repository root")
 	fs.StringVar(&storePath, "store", "", "absolute external counter store")
 	fs.StringVar(&app, "app", "", "stable application identity")
 	fs.BoolVar(&machine, "json", machine, "JSON output/errors")
 	fs.DurationVar(&timeout, "timeout", 30*time.Second, "operation deadline")
+	if command == "counter-init" || command == "counter-migrate" {
+		fs.StringVar(&seedFile, "seed-file", "", "explicit legacy Seed JSON evidence")
+		fs.BoolVar(&seedCommits, "seed-commits", false, "one-time canonical HEAD reachable-commit fallback")
+		fs.StringVar(&branch, "branch", "main", "canonical integration branch for commit fallback")
+		fs.StringVar(&evidence, "evidence", "", "legacy investigation evidence for commit fallback")
+	}
 	if command == "build" {
 		fs.StringVar(&id, "request-id", "", "unique logical build-attempt ID")
 		fs.StringVar(&version, "version", "", "explicit source or verified release version")
@@ -84,14 +91,40 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	if err = externalStore(repoPath, storePath); err != nil {
 		return fail(2, err, nil)
 	}
-	if command == "counter-init" {
-		store, err := buildcounter.Initialize(ctx, storePath, app)
+	if command == "counter-init" || command == "counter-migrate" || command == "counter-status" {
+		var store *buildcounter.Store
+		var status buildcounter.Status
+		if command == "counter-status" {
+			store, err = buildcounter.Open(storePath, app)
+		} else {
+			seed, e := counterSeed(ctx, repository, seedFile, seedCommits, branch, evidence)
+			if e != nil {
+				return fail(2, e, nil)
+			}
+			if command == "counter-init" {
+				if seed == nil {
+					store, err = buildcounter.Initialize(ctx, storePath, app)
+				} else {
+					store, err = buildcounter.InitializeSeed(ctx, storePath, app, *seed)
+				}
+			} else {
+				if seed == nil {
+					return fail(2, errors.New("counter-migrate requires --seed-file or --seed-commits"), nil)
+				}
+				store, err = buildcounter.Open(storePath, app)
+				if err == nil {
+					status, err = store.Migrate(ctx, *seed)
+				}
+			}
+		}
 		if err != nil {
 			return fail(1, err, nil)
 		}
-		status, err := store.Status(ctx)
-		if err != nil {
-			return fail(1, err, nil)
+		if command != "counter-migrate" {
+			status, err = store.Status(ctx)
+			if err != nil {
+				return fail(1, err, nil)
+			}
 		}
 		if machine {
 			err = json.NewEncoder(stdout).Encode(status)
@@ -99,10 +132,11 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 			_, err = fmt.Fprintf(stdout, "Application: %s\nCounter ID: %s\nLast number: %d\n", status.Application, status.CounterID, status.LastNumber)
 		}
 		if err != nil {
-			return fail(1, errors.New("could not write counter output"), nil)
+			return fail(1, errors.New("could not write counter output; inspect authority before retrying"), nil)
 		}
 		return 0
 	}
+
 	info, err := repository.Inspect(ctx)
 	if err != nil {
 		return fail(1, err, nil)

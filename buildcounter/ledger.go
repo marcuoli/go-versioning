@@ -19,12 +19,30 @@ const maximumRecordSize = 16 * 1024
 // Exclusive creation avoids overwriting a reservation even after external state
 // damage. Sync the complete file before acknowledging it. Interrupted writes
 // remain visible and stop future allocation rather than silently reusing a number.
-func writeNew(path string, value any) error {
+func recordBytes(value any) ([]byte, error) {
 	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	data = append(data, '\n')
+	if len(data) > maximumRecordSize {
+		return nil, errors.New("encoded counter record exceeds supported size")
+	}
+	return data, nil
+}
+func replaceJSON(path string, value any) error {
+	data, err := recordBytes(value)
 	if err != nil {
 		return err
 	}
-	data = append(data, '\n')
+	return replaceBytes(path, data)
+}
+
+func writeNew(path string, value any) error {
+	data, err := recordBytes(value)
+	if err != nil {
+		return err
+	}
 	return writeBytesNew(path, data)
 }
 
@@ -72,7 +90,7 @@ func readJSON(path string, value any) error {
 		return err
 	}
 	if !bytes.Equal(bytes.TrimSpace(data), canonical) {
-		return errors.New("counter record is not canonical schema1 JSON")
+		return errors.New("counter record is not canonical JSON")
 	}
 	return nil
 }
@@ -82,7 +100,7 @@ func readHeader(path string) (header, error) {
 	if err := readJSON(filepath.Join(path, "counter.json"), &h); err != nil {
 		return h, err
 	}
-	if h.Schema != 1 || !identityPattern.MatchString(h.Application) || !authorityPattern.MatchString(h.CounterID) || h.CreatedTime == "" {
+	if (h.Schema != 1 && h.Schema != 2) || !identityPattern.MatchString(h.Application) || !authorityPattern.MatchString(h.CounterID) || h.CreatedTime == "" {
 		return h, errors.New("invalid counter authority metadata")
 	}
 	if _, err := versioning.Resolve(versioning.Info{BuildTime: h.CreatedTime}, versioning.Info{}); err != nil {
@@ -99,15 +117,30 @@ func readHeader(path string) (header, error) {
 }
 
 func (s *Store) ledger(ctx context.Context) ([]Reservation, error) {
+	h, err := readHeader(s.path)
+	if err != nil {
+		return nil, err
+	}
+	b, err := s.readBaseline(h)
+	if err != nil {
+		return nil, err
+	}
 	entries, err := os.ReadDir(filepath.Join(s.path, "reservations"))
 	if err != nil {
 		return nil, err
 	}
-	issued, err := s.issued(ctx)
+	issued, err := s.issued(ctx, b)
 	if err != nil {
 		return nil, err
 	}
-	if issued != uint64(len(entries)) {
+	if b.PriorAttempts > uint64(len(entries)) {
+		return nil, errors.New("baseline prefix exceeds preserved ledger")
+	}
+	expected, err := b.number(uint64(len(entries)))
+	if err != nil {
+		return nil, err
+	}
+	if issued != expected {
 		return nil, errors.New("issued sequence and reservation ledger disagree; preserve state for recovery")
 	}
 	records := make([]Reservation, 0, len(entries))
@@ -116,7 +149,10 @@ func (s *Store) ledger(ctx context.Context) ([]Reservation, error) {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		number := uint64(index) + 1
+		number, err := b.number(uint64(index) + 1)
+		if err != nil {
+			return nil, err
+		}
 		if entry.Name() != fmt.Sprintf("%020d.json", number) {
 			return nil, errors.New("counter ledger has an unexpected entry or sequence gap")
 		}
@@ -133,6 +169,15 @@ func (s *Store) ledger(ctx context.Context) ([]Reservation, error) {
 		}
 		requests[r.RequestID] = true
 		records = append(records, r)
+	}
+	if h.Schema == 2 {
+		last, err := lastNumber(b.Seed.Number, uint64(len(records)))
+		if err != nil {
+			return nil, err
+		}
+		if err = s.checkVersion(last, false); err != nil {
+			return nil, err
+		}
 	}
 	return records, nil
 }
@@ -156,7 +201,7 @@ func (s *Store) issue(number uint64) error {
 	return errors.Join(writeErr, file.Close())
 }
 
-func (s *Store) issued(ctx context.Context) (uint64, error) {
+func (s *Store) issued(ctx context.Context, b baseline) (uint64, error) {
 	path := filepath.Join(s.path, "issued.log")
 	stat, err := os.Lstat(path)
 	if err != nil {
@@ -171,7 +216,7 @@ func (s *Store) issued(ctx context.Context) (uint64, error) {
 	}
 	defer file.Close()
 	reader := bufio.NewReader(file)
-	var last uint64
+	var last, index uint64
 	for {
 		if err := ctx.Err(); err != nil {
 			return 0, err
@@ -179,12 +224,19 @@ func (s *Store) issued(ctx context.Context) (uint64, error) {
 		// ReadSlice bounds malformed lines and avoids an unbounded corrupt record.
 		data, err := reader.ReadSlice('\n')
 		if err == io.EOF && len(data) == 0 {
+			if index == 0 {
+				return b.number(0)
+			}
 			return last, nil
 		}
 		if err != nil {
 			return 0, errors.New("issued sequence is incomplete or unreadable")
 		}
-		next, err := nextNumber(last)
+		index, err = nextNumber(index)
+		if err != nil {
+			return 0, err
+		}
+		next, err := b.number(index)
 		if err != nil {
 			return 0, err
 		}

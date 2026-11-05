@@ -5,6 +5,7 @@ package buildcounter
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -41,18 +42,21 @@ type Reservation struct {
 	Info        versioning.Info `json:"info"`
 }
 
-// Status describes the tracked sequence since explicit initialization, not a
-// reconstructed lifetime count of historical builds.
+// Status reports the baseline plus tracked attempts. Baseline is continuity
+// evidence, not a reconstructed lifetime count of historical builds.
 type Status struct {
-	Application string `json:"application"`
-	CounterID   string `json:"counter_id"`
-	LastNumber  uint64 `json:"last_number"`
+	Application     string `json:"application"`
+	CounterID       string `json:"counter_id"`
+	LastNumber      uint64 `json:"last_number"`
+	TrackedAttempts uint64 `json:"tracked_attempts"`
+	Baseline        *Seed  `json:"baseline,omitempty"`
 }
 type header struct {
-	Schema      int    `json:"schema"`
-	Application string `json:"application"`
-	CounterID   string `json:"counter_id"`
-	CreatedTime string `json:"created_time"`
+	Schema         int    `json:"schema"`
+	Application    string `json:"application"`
+	CounterID      string `json:"counter_id"`
+	CreatedTime    string `json:"created_time"`
+	BaselineSHA256 string `json:"baseline_sha256,omitempty"`
 }
 
 var identityPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
@@ -71,9 +75,14 @@ func contextError(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// Initialize creates a new authority starting at1. The parent directory must
+// Initialize creates a new authority with VERSION 0 and first reservation 1.
+// The parent directory must
 // exist. Existing or partially initialized paths are never reset or adopted.
 func Initialize(ctx context.Context, path, application string) (*Store, error) {
+	return initialize(ctx, path, application, nil)
+}
+
+func initialize(ctx context.Context, path, application string, seed *Seed) (*Store, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
@@ -97,10 +106,30 @@ func Initialize(ctx context.Context, path, application string) (*Store, error) {
 	if _, err = rand.Read(entropy[:]); err != nil {
 		return nil, err
 	}
-	h := header{Schema: 1, Application: application, CounterID: hex.EncodeToString(entropy[:]), CreatedTime: time.Now().UTC().Format(time.RFC3339Nano)}
+	h := header{Schema: 2, Application: application, CounterID: hex.EncodeToString(entropy[:]), CreatedTime: time.Now().UTC().Format(time.RFC3339Nano)}
+	var initial uint64
+	if seed != nil {
+		initial = seed.Number
+		receipt := baseline{Seed: *seed, CounterID: h.CounterID, AppliedTime: h.CreatedTime}
+		data, e := recordBytes(receipt)
+		if e != nil {
+			return nil, e
+		}
+		digest := sha256.Sum256(data)
+		h.BaselineSHA256 = hex.EncodeToString(digest[:])
+		if err = writeBytesNew(filepath.Join(path, "baseline.json"), data); err != nil {
+			return nil, err
+		}
+	}
+	if err = writeBytesNew(filepath.Join(path, "VERSION"), []byte(fmt.Sprintf("%d\n", initial))); err != nil {
+		return nil, err
+	}
+	// Publish the header last: no allocator can open a valid zero-based authority
+	// while seeded initialization is incomplete, canceled or interrupted.
 	if err = writeNew(filepath.Join(path, "counter.json"), h); err != nil {
 		return nil, err
 	}
+
 	return Open(path, application)
 }
 
@@ -209,7 +238,19 @@ func (s *Store) Reserve(ctx context.Context, req Request) (result Reservation, e
 			return r, nil
 		}
 	}
-	number, err := nextNumber(uint64(len(records)))
+	h, err := readHeader(s.path)
+	if err != nil {
+		return result, err
+	}
+	b, err := s.readBaseline(h)
+	if err != nil {
+		return result, err
+	}
+	last, err := lastNumber(b.Seed.Number, uint64(len(records)))
+	if err != nil {
+		return result, err
+	}
+	number, err := nextNumber(last)
 	if err != nil {
 		return result, err
 	}
@@ -225,6 +266,11 @@ func (s *Store) Reserve(ctx context.Context, req Request) (result Reservation, e
 	}
 	if err = writeNew(filepath.Join(s.path, "reservations", fmt.Sprintf("%020d.json", number)), result); err != nil {
 		return result, err
+	}
+	if h.Schema == 2 {
+		if err = s.replaceVersion(number); err != nil {
+			return result, err
+		}
 	}
 	return result, nil
 }
@@ -245,7 +291,19 @@ func (s *Store) Status(ctx context.Context) (result Status, err error) {
 	if err != nil {
 		return result, err
 	}
-	return Status{Application: s.application, CounterID: s.id, LastNumber: uint64(len(records))}, nil
+	h, err := readHeader(s.path)
+	if err != nil {
+		return result, err
+	}
+	b, err := s.readBaseline(h)
+	if err != nil {
+		return result, err
+	}
+	last, err := lastNumber(b.Seed.Number, uint64(len(records)))
+	if err != nil {
+		return result, err
+	}
+	return s.status(last, b, uint64(len(records))), nil
 }
 func nextNumber(last uint64) (uint64, error) {
 	if last == math.MaxUint64 {

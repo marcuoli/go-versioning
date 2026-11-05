@@ -19,6 +19,8 @@ const helpText = `go-versioning: application version metadata and immutable Git 
 
 Usage:
   go-versioning counter-init --repo DIR --store ABSOLUTE_PATH --app ID [--json]
+  go-versioning counter-migrate --repo DIR --store ABSOLUTE_PATH --app ID (--seed-file JSON | --seed-commits --evidence TEXT) [--json]
+  go-versioning counter-status --repo DIR --store ABSOLUTE_PATH --app ID [--json]
   go-versioning build --repo DIR --store ABSOLUTE_PATH --app ID --request-id ID [--json | --format ldflags]
   go-versioning inspect --repo DIR [--json]
   go-versioning next --repo DIR --branch BRANCH --commit SHA --pr NUMBER [options]
@@ -39,6 +41,12 @@ Build counter options:
   --version VERSION --commit SHA   Optional expected metadata (commit must match HEAD)
   --release --branch main          Verify an existing tag, clean HEAD and reviewed bump policy
 
+  --seed-file JSON                 Verified legacy Seed (init or one-time migration)
+  --seed-commits --branch main      One-time complete HEAD count if no legacy method/value
+  --evidence TEXT                  Investigation evidence required with --seed-commits
+
+counter-init without a seed begins at VERSION 0; seeded authorities preserve continuity.
+VERSION is one decimal line inside the external authority, separate from release identity.
 counter-init is explicit; build never auto-initializes or repairs state.
 Failed builds consume reservations. Runtime CurrentBuild never allocates.
 next is read-only. tag creates locally unless --push --remote is supplied.
@@ -79,7 +87,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	command := args[0]
-	if command == "counter-init" || command == "build" {
+	if command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "build" {
 		return runCounter(ctx, args, stdout, stderr)
 	}
 	if command != "inspect" && command != "next" && command != "tag" {
