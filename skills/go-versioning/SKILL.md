@@ -49,6 +49,23 @@ read the [maintained policy](https://github.com/marcuoli/go-versioning/blob/main
 Do not automatically create a bare `vCORE` alias to satisfy a package manager.
 Keep any separately approved module-release coordinates explicit.
 
+## Overall build counters
+
+Use the released shared `buildcounter` API/CLI for explicit build-time allocation,
+not a PR, commit count or dependency version. Initialize one external authority
+explicitly; no inferred historical baseline. Failed builds consume reservations;
+retries of the same allocation request retain their original number/time. A new
+compile invocation uses a new request ID. All cooperating checkouts/CI must use
+the same live store; cloud-sync/independent stores cannot claim one global order.
+Read the [counter contract](https://github.com/marcuoli/go-versioning/blob/main/docs/build-counters.md)
+for failure/recovery and filesystem limits. Keep `BuildCounterID` provenance.
+
+Prefer shared CLI linker flags and read-only `CurrentBuild()` so consumers do not
+duplicate parsing/allocation logic. Unknown counters remain zero; an untagged app
+can have a genuine counter while its release version remains `0.0.0+unknown`.
+A renderer only displays those fields. Never allocate at application startup or
+substitute commit time for an unknown actual build timestamp.
+
 ## Scope
 
 Apply this to the requested app. Preserve published tags/releases and unrelated

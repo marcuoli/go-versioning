@@ -18,6 +18,8 @@ import (
 const helpText = `go-versioning: application version metadata and immutable Git tags
 
 Usage:
+  go-versioning counter-init --repo DIR --store ABSOLUTE_PATH --app ID [--json]
+  go-versioning build --repo DIR --store ABSOLUTE_PATH --app ID --request-id ID [--json | --format ldflags]
   go-versioning inspect --repo DIR [--json]
   go-versioning next --repo DIR --branch BRANCH --commit SHA --pr NUMBER [options]
   go-versioning tag --repo DIR --branch BRANCH --commit SHA --pr NUMBER [options]
@@ -30,6 +32,15 @@ Options:
   --json                           Emit JSON output and JSON errors
   --help                           Show this help
 
+Build counter options:
+  --store ABSOLUTE_PATH --app ID   One explicitly initialized external authority
+  --request-id ID                  Fresh per build invocation; reuse only for allocation retries
+  --format text|json|ldflags        Shared metadata or library-owned linker flags
+  --version VERSION --commit SHA   Optional expected metadata (commit must match HEAD)
+  --release --branch main          Verify an existing tag, clean HEAD and reviewed bump policy
+
+counter-init is explicit; build never auto-initializes or repairs state.
+Failed builds consume reservations. Runtime CurrentBuild never allocates.
 next is read-only. tag creates locally unless --push --remote is supplied.
 A complete, non-shallow repository and a full target commit are required.
 `
@@ -68,6 +79,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	command := args[0]
+	if command == "counter-init" || command == "build" {
+		return runCounter(ctx, args, stdout, stderr)
+	}
 	if command != "inspect" && command != "next" && command != "tag" {
 		return fail(2, errors.New("unknown subcommand; use --help"), nil)
 	}
@@ -227,6 +241,9 @@ func render(out io.Writer, machine bool, value any) error {
 	switch v := value.(type) {
 	case versioning.Info:
 		_, err := fmt.Fprintf(out, "Version: %s\nCommit: %s\nBuild time: %s\n", v.Version, v.Commit, v.BuildTime)
+		if err == nil && v.OverallBuildNumber != 0 {
+			_, err = fmt.Fprintf(out, "Overall build number: %d\nCounter ID: %s\n", v.OverallBuildNumber, v.BuildCounterID)
+		}
 		return err
 	case gitversion.Plan:
 		_, err := fmt.Fprintf(out, "Version: %s\nTag: %s\nCommit: %s\nBranch: %s\nPrevious tag: %s\nVerification: %s\n", v.Version, v.Tag, v.Commit, v.Branch, v.PreviousTag, v.Verification)

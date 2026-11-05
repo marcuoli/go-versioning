@@ -3,8 +3,8 @@
 Reusable application version metadata and immutable Git tag allocation, using only the Go standard library.
 
 ```sh
-go get github.com/marcuoli/go-versioning@v0.1.1
-go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.1.1
+go get github.com/marcuoli/go-versioning@v0.2.0+20261105.7
+go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.2.0+20261105.7
 ```
 
 Requires Go 1.27.3 or later. Repository operations also require Git.
@@ -16,6 +16,7 @@ Requires Go 1.27.3 or later. Repository operations also require Git.
 | --- | --- |
 | `github.com/marcuoli/go-versioning` | Application versions and runtime build metadata |
 | `github.com/marcuoli/go-versioning/gitversion` | Explicit Git inspection and tag allocation |
+| `github.com/marcuoli/go-versioning/buildcounter` | Explicit external build-attempt authority and reservations |
 
 The CLI is separate under `cmd/go-versioning`. See [architecture](docs/architecture.md)
 for ownership and [contributing](CONTRIBUTING.md) for the development workflow.
@@ -87,6 +88,22 @@ remain explicitly unknown. No timestamp is fabricated.
 The runtime package never executes Git or discovers a repository from the
 current directory. Source tools can opt in with `gitversion.NewContext(ctx, repositoryDirectory)`
 and `Repository.Inspect(ctx)`; that explicit repository produces a snapshot.
+
+## Shared build counters
+
+Build tools can explicitly initialize an external `buildcounter` authority and
+reserve a real increasing number per logical build attempt. Failed builds consume
+numbers; allocation-request retries are idempotent. All cooperating checkouts/CI
+must share that live authority. No historical count or release version is invented.
+
+The CLI `counter-init` and `build` commands produce validated metadata or shared
+linker flags. Applications call `versioning.CurrentBuild()`; startup never
+allocates or accesses a store. Optional `Info.OverallBuildNumber` and
+`Info.BuildCounterID` preserve zero/empty unknown defaults. A known number is
+independent of whether the app's release version is unknown.
+
+Read [build counters](docs/build-counters.md) for exact persistence, failure,
+retry, scope, recovery and build-script contracts before enabling allocation.
 
 ## CLI
 

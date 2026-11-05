@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.0+20261105.7
+
+- **Source PR #7, issue #6:** Add explicit persistent build-attempt counters, authority provenance, retry/failure semantics and shared validated linker metadata without runtime allocation.
 
 - **Source PR #5, issue #4:** Document the complete date/PR application identity across display and releases, distinguish Go installation coordinates, and add a discoverable shared Codex skill.
 

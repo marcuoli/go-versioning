@@ -44,3 +44,12 @@ as a Go module. Go's resolved module version is a technical installation
 coordinate and may be a pseudo-version; it is not an alternate app identity.
 See the [application version policy](application-version-policy.md) for Go 1.27.3
 resolution behavior, explicit coordinate-to-commit mapping and verification.
+
+## Build-attempt metadata
+
+Tag allocation and build counters are independent. Use the explicit shared
+[build counter](build-counters.md) only when builders can reach one persistent
+authority; a runner-local counter or Actions run number does not establish a
+global sequence. Reserve once for a logical multi-target build and distribute its
+validated metadata to jobs; failed builds retain the reservation. Runtime startup
+only reads injected metadata. Preserve the full date/PR release identity.

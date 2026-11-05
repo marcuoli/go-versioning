@@ -5,6 +5,8 @@ This is an importable Go library with optional Git integration and a CLI.
 ## Package boundaries
 - Keep the public application-version and build-metadata API at the module root.
 - Keep explicit repository operations in the public `gitversion` subpackage.
+- Keep explicit persisted build-attempt allocation in the public `buildcounter` package.
+  Runtime metadata never allocates, initializes or opens a counter store.
 - Keep commands, flags and CLI presentation under `cmd/go-versioning`.
 - Add `internal` packages only when actual private implementation needs them.
 - Preserve public API compatibility and the separation between runtime metadata and Git discovery.

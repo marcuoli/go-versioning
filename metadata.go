@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -11,13 +12,19 @@ import (
 // Info describes an application build. Empty Commit and BuildTime mean unknown;
 // Commit, when present, is a full 40- or 64-digit hexadecimal identity, and
 // BuildTime, when present, is RFC3339. Version uses UnknownVersion when unknown.
+// OverallBuildNumber zero and empty BuildCounterID mean no known reservation.
+// A positive number requires its authority ID and complete build identity.
 type Info struct {
-	Version   string `json:"version"`
-	Commit    string `json:"commit"`
-	BuildTime string `json:"build_time"`
+	Version            string `json:"version"`
+	Commit             string `json:"commit"`
+	BuildTime          string `json:"build_time"`
+	OverallBuildNumber uint64 `json:"overall_build_number,omitempty"`
+	BuildCounterID     string `json:"build_counter_id,omitempty"`
 }
 
 var buildTimePattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]+)?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$`)
+
+var counterIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 var commitPattern = regexp.MustCompile(`^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`)
 var moduleVersionPattern = regexp.MustCompile(`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
@@ -54,6 +61,14 @@ func Resolve(injected, embedded Info) (Info, error) {
 	if in.Version == "" {
 		in.Version = UnknownVersion
 	}
+	// A reservation belongs to one complete build identity. Never attach an
+	// embedded counter to independently overridden version/time/commit fields.
+	if em.OverallBuildNumber != 0 {
+		if in.Version != em.Version || in.Commit != em.Commit || in.BuildTime != em.BuildTime {
+			return Info{}, fmt.Errorf("embedded build counter conflicts with resolved build identity")
+		}
+		in.OverallBuildNumber, in.BuildCounterID = em.OverallBuildNumber, em.BuildCounterID
+	}
 	return in, nil
 }
 
@@ -88,6 +103,14 @@ func validateInfo(info Info, embedded bool) (Info, error) {
 		}
 		if _, err := time.Parse(time.RFC3339, info.BuildTime); err != nil {
 			return Info{}, fmt.Errorf("invalid build time: %w", err)
+		}
+	}
+	// Zero/empty preserves legacy metadata and explicitly means unknown. A known
+	// number requires an authority ID and complete identity from the build tool;
+	// runtime discovery never invents a counter from VCS or module information.
+	if info.OverallBuildNumber != 0 || info.BuildCounterID != "" {
+		if info.OverallBuildNumber == 0 || !counterIDPattern.MatchString(info.BuildCounterID) || !complete(info) {
+			return Info{}, fmt.Errorf("build counter requires a positive number, authority ID and complete version/commit/time")
 		}
 	}
 	return info, nil
@@ -140,4 +163,17 @@ func Current(injected Info) (Info, error) {
 		return info, nil
 	}
 	return Resolve(info, ReadBuildInfo())
+}
+
+// ParseBuildNumber parses a string linker value. Empty or "0" means unknown;
+// signs, whitespace, leading zeroes and overflow are rejected.
+func ParseBuildNumber(value string) (uint64, error) {
+	if value == "" || value == "0" {
+		return 0, nil
+	}
+	number, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || strconv.FormatUint(number, 10) != value {
+		return 0, fmt.Errorf("build number must be canonical unsigned decimal")
+	}
+	return number, nil
 }

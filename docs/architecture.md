@@ -32,3 +32,12 @@ is a concrete shared private responsibility, rather than scaffolding empty layer
 
 Go 1.27.3 is the development and module baseline. Runtime packages use only the
 standard library, and distribution builds retain `CGO_ENABLED=0`.
+
+## Build-time counter authority
+
+The public `buildcounter` package owns explicitly initialized external stores,
+locking, complete ledger validation and immutable attempt reservations. It imports
+root metadata policy but no Git or UI. Root `CurrentBuild` and linker metadata
+remain read-only and never import this allocator. The CLI composes explicit Git
+inspection/release verification with the counter at build time. See
+[build counters](build-counters.md) for scope and failure semantics.
