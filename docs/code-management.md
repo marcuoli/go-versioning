@@ -26,11 +26,19 @@ Editor build tasks remain local and offline; publication is a deliberate
 separate operation.
 
 ## Release identities
-This repository is a Go dependency: use conventional immutable module tags such
-as `v0.1.0`, following module path-major rules for later major versions.
-The library also implements the separate application identity
-`MAJOR.MINOR.PATCH+YYYYMMDD.PR`. Do not confuse these two contracts or move a
-published tag to repair a release.
+Apply the [application version policy](application-version-policy.md) to consumer
+apps: the full identity is `MAJOR.MINOR.PATCH+YYYYMMDD.PR`, including display,
+release names, versioned artifacts and immutable `v`-prefixed application tags.
+Use the final merged commit's committer date in `America/Sao_Paulo` and the actual
+merged PR number. A numeric core or resolved dependency version is insufficient
+for identifying an application release.
+
+This repository is also a Go dependency. Conventional immutable module tags such
+as `v0.1.1` remain technical installation coordinates, following Go's module
+path-major and canonicalization rules. Verify their exact source commit; never
+substitute them for a consumer's displayed app identity. Preserve published tags
+and releases. The shared [Codex skill](../skills/go-versioning/SKILL.md) makes this
+policy discoverable without changing consumer repositories automatically.
 
 ## Source and public copy
 Use the configured Gitea origin as the source of truth. The public GitHub copy

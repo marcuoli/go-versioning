@@ -34,8 +34,24 @@ the target commit's committer date in `America/Sao_Paulo`; the positive suffix
 is the merged pull-request number. Build metadata does not affect SemVer
 precedence. Order builds by Git ancestry and pull-request identity.
 
-This library has its own conventional module releases, such as `v0.1.0`.
-Application tags with date/PR metadata are a separate versioning contract.
+Use the complete identity everywhere an application version is shown: CLI output,
+UI headers/footers, About pages, API build metadata, logs, release names and
+versioned artifact names. For example, `0.8.0+20261105.16` remains intact;
+`0.8.0` is only its numeric core. The immutable application tag is
+`v0.8.0+20261105.16` on the actual final merge commit.
+
+Read the [application version policy](docs/application-version-policy.md) for
+release verification and package-manager constraints. This library's conventional
+Go module tags, such as `v0.1.1`, are dependency installation coordinates. They do
+not replace an application's full displayed identity. Go 1.27.3 can resolve a
+`+metadata` tag to a pseudo-version, so never infer the app version from a
+resolved module version or claim that a full app tag is a canonical Go module
+version without checking it.
+
+For Codex, use the shared [`go-versioning` skill](skills/go-versioning/SKILL.md)
+when integrating or releasing a consumer. Copy that folder into your Codex
+`skills` directory to enable discovery, or invoke the installed `$go-versioning`
+skill explicitly. Consumer source changes remain scoped to the requested app.
 
 ## Embed application build metadata
 

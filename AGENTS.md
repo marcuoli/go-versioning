@@ -38,7 +38,11 @@ This is an importable Go library with optional Git integration and a CLI.
   application source, inventories and generated logs out of commits.
 - Keep credentials in existing helpers or repository-scoped secrets, outside arguments/logs.
 - Run `govulncheck ./...` with a maintained scanner before a release.
-- Module releases use immutable conventional tags such as `v0.1.0`; do not move or reuse them.
-  Date/PR application tags are this library's output contract, not its module-release scheme.
+- Follow `docs/application-version-policy.md` and `skills/go-versioning/SKILL.md`:
+  applications use the complete `CORE+YYYYMMDD.PR` identity in display, release names,
+  versioned artifacts and immutable `v`-prefixed application tags.
+- Conventional Go module tags remain technical installation coordinates constrained by
+  cmd/go canonicalization, never alternate displayed app versions. Preserve existing
+  module/application tags and releases; verify coordinate-to-commit identity.
 - Verify identical source/copy branch and tag identities and successful automation before
   reporting copying or publication complete.

@@ -13,6 +13,9 @@ The Gitea source repository accepts implementation changes. The public GitHub
 repository is copied from that source. Keep source changes in one history;
 see [copying](docs/mirroring.md) for synchronization and conflict behavior.
 
-Each merged pull request includes its own `CHANGELOG.md` entry. Module release
-tags are immutable ordinary Go module versions. Release publication is deliberate
+Each merged pull request includes its own `CHANGELOG.md` entry. Follow the
+[application version policy](docs/application-version-policy.md) and the shared
+[go-versioning skill](skills/go-versioning/SKILL.md) for full date/PR identities.
+Conventional Go module tags are immutable technical installation coordinates;
+they do not replace an app's displayed version. Release publication is deliberate
 and separate from default local builds.

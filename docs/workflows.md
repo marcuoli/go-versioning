@@ -37,5 +37,10 @@ Tag allocation does not publish packages, create a release page or modify
 application source. A separate release process should verify a clean checkout,
 exact canonical tag and matching remote commit before injecting metadata.
 
-The date/PR version is suitable for applications. Go dependencies should use
-ordinary module versions, as this module does.
+Use the full allocated application version in release names, display text,
+versioned artifact names and injected metadata; use its `v`-prefixed tag for the
+exact final merged commit. Keep the date/PR suffix when the app is also imported
+as a Go module. Go's resolved module version is a technical installation
+coordinate and may be a pseudo-version; it is not an alternate app identity.
+See the [application version policy](application-version-policy.md) for Go 1.27.3
+resolution behavior, explicit coordinate-to-commit mapping and verification.

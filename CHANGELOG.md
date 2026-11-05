@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Source PR #5, issue #4:** Document the complete date/PR application identity across display and releases, distinguish Go installation coordinates, and add a discoverable shared Codex skill.
+
 ## v0.1.1
 
 - **Source PR #3:** Preserve annotated release tags during public copying, retain the documented v0.1.0 historical refs, and pin current consumer examples.
