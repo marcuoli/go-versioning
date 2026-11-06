@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"syscall"
 	"time"
 
 	versioning "github.com/marcuoli/go-versioning"
@@ -45,11 +47,13 @@ type Reservation struct {
 // Status reports the baseline plus tracked attempts. Baseline is continuity
 // evidence, not a reconstructed lifetime count of historical builds.
 type Status struct {
-	Application     string `json:"application"`
-	CounterID       string `json:"counter_id"`
-	LastNumber      uint64 `json:"last_number"`
-	TrackedAttempts uint64 `json:"tracked_attempts"`
-	Baseline        *Seed  `json:"baseline,omitempty"`
+	Application       string `json:"application"`
+	CounterID         string `json:"counter_id"`
+	LastNumber        uint64 `json:"last_number"`
+	TrackedAttempts   uint64 `json:"tracked_attempts"`
+	Baseline          *Seed  `json:"baseline,omitempty"`
+	VersionFile       string `json:"version_file,omitempty"`
+	LocationCompliant bool   `json:"location_compliant"`
 }
 type header struct {
 	Schema         int    `json:"schema"`
@@ -57,6 +61,11 @@ type header struct {
 	CounterID      string `json:"counter_id"`
 	CreatedTime    string `json:"created_time"`
 	BaselineSHA256 string `json:"baseline_sha256,omitempty"`
+	VersionFile    string `json:"version_file,omitempty"`
+	JournalPath    string `json:"journal_path,omitempty"`
+	VersionPending bool   `json:"version_pending,omitempty"`
+	LocatedNumber  uint64 `json:"located_number,omitempty"`
+	HadVersion     bool   `json:"had_version,omitempty"`
 }
 
 var identityPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
@@ -79,10 +88,10 @@ func contextError(ctx context.Context) error {
 // The parent directory must
 // exist. Existing or partially initialized paths are never reset or adopted.
 func Initialize(ctx context.Context, path, application string) (*Store, error) {
-	return initialize(ctx, path, application, nil)
+	return initialize(ctx, path, application, nil, "")
 }
 
-func initialize(ctx context.Context, path, application string, seed *Seed) (*Store, error) {
+func initialize(ctx context.Context, path, application string, seed *Seed, versionFile string) (*Store, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
@@ -90,8 +99,31 @@ func initialize(ctx context.Context, path, application string, seed *Seed) (*Sto
 	if err != nil {
 		return nil, err
 	}
+	if versionFile != "" {
+		versionFile, err = canonicalVersionFile(versionFile)
+		if err != nil {
+			return nil, err
+		}
+		if err = separateLocation(path, versionFile); err != nil {
+			return nil, err
+		}
+		var number uint64
+		if seed != nil {
+			number = seed.Number
+		}
+		if err = checkNumberFile(versionFile, number, true); err != nil {
+			return nil, err
+		}
+		if _, e := os.Lstat(versionFile + ".authority.json"); !errors.Is(e, os.ErrNotExist) {
+			return nil, errors.New("main VERSION already has ownership; no new authority may replace it")
+		}
+	}
 	if err = os.Mkdir(path, 0700); err != nil {
 		return nil, fmt.Errorf("initialize new counter directory: %w", err)
+	}
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, err
 	}
 	// On initialization failure retain the incomplete directory for inspection;
 	// silently deleting it could conceal an uncertain first publication.
@@ -121,9 +153,24 @@ func initialize(ctx context.Context, path, application string, seed *Seed) (*Sto
 			return nil, err
 		}
 	}
-	if err = writeBytesNew(filepath.Join(path, "VERSION"), []byte(fmt.Sprintf("%d\n", initial))); err != nil {
-		return nil, err
+	if versionFile == "" {
+		if err = writeBytesNew(filepath.Join(path, "VERSION"), []byte(fmt.Sprintf("%d\n", initial))); err != nil {
+			return nil, err
+		}
+	} else {
+		h.Schema = 3
+		h.VersionFile = versionFile
+		h.JournalPath = path
+		h.LocatedNumber = initial
+		bound := &Store{path: path, application: application, id: h.CounterID}
+		if err = bound.claimOwner(h, false); err != nil {
+			return nil, err
+		}
+		if err = createNumber(versionFile, initial); err != nil {
+			return nil, err
+		}
 	}
+
 	// Publish the header last: no allocator can open a valid zero-based authority
 	// while seeded initialization is incomplete, canceled or interrupted.
 	if err = writeNew(filepath.Join(path, "counter.json"), h); err != nil {
@@ -178,6 +225,7 @@ func (s *Store) lock(ctx context.Context) (func() error, error) {
 	lock := filepath.Join(s.path, ".lock")
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
+	permissionRetries := 0
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -187,7 +235,13 @@ func (s *Store) lock(ctx context.Context) (func() error, error) {
 			return func() error { return os.Remove(lock) }, nil
 		}
 		if !errors.Is(err, os.ErrExist) {
-			return nil, fmt.Errorf("acquire counter lock: %w", err)
+			// Windows may return ERROR_ACCESS_DENIED while a removed lock directory
+			// remains delete-pending (issue #11 reproducer). Retry only that mkdir result
+			// at most three times. Persistent denial is still reported; no ACL/lock is changed.
+			if runtime.GOOS != "windows" || !errors.Is(err, syscall.Errno(5)) || permissionRetries >= 3 {
+				return nil, fmt.Errorf("acquire counter lock: %w", err)
+			}
+			permissionRetries++
 		}
 		// A PID, timeout or wall clock cannot prove another machine stopped writing.
 		// Never steal a lock; crashed writers require deliberate operator recovery.
@@ -267,7 +321,7 @@ func (s *Store) Reserve(ctx context.Context, req Request) (result Reservation, e
 	if err = writeNew(filepath.Join(s.path, "reservations", fmt.Sprintf("%020d.json", number)), result); err != nil {
 		return result, err
 	}
-	if h.Schema == 2 {
+	if h.Schema >= 2 {
 		if err = s.replaceVersion(number); err != nil {
 			return result, err
 		}
@@ -303,7 +357,7 @@ func (s *Store) Status(ctx context.Context) (result Status, err error) {
 	if err != nil {
 		return result, err
 	}
-	return s.status(last, b, uint64(len(records))), nil
+	return s.status(last, b, uint64(len(records)), h.VersionFile), nil
 }
 func nextNumber(last uint64) (uint64, error) {
 	if last == math.MaxUint64 {

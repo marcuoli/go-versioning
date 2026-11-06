@@ -3,8 +3,8 @@
 Reusable application version metadata and immutable Git tag allocation, using only the Go standard library.
 
 ```sh
-go get github.com/marcuoli/go-versioning@v0.3.0+20261105.9
-go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.3.0+20261105.9
+go get github.com/marcuoli/go-versioning@v0.3.1+20261106.12
+go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.3.1+20261106.12
 ```
 
 Requires Go 1.27.3 or later. Repository operations also require Git.
@@ -96,12 +96,14 @@ reserve a real increasing number per logical build attempt. Failed builds consum
 numbers; allocation-request retries are idempotent. All cooperating checkouts/CI
 must share that live authority. No historical count or release version is invented.
 
-The authority owns a one-line numeric `VERSION`, separate from the application
+The authority binds a one-line numeric `VERSION` at permanent canonical main,
+with journals/receipts external. See [location migration](docs/counter-location.md).
+This is separate from the application
 release identity. Investigate and preserve an existing sequence before migration;
 only when none exists, seed once from complete canonical HEAD reachable commits.
 Explicit `counter-migrate` preserves earlier reservations and allocation retries.
 
-The CLI `counter-init`, `counter-migrate`, `counter-status` and `build` commands produce validated metadata or shared
+The CLI `counter-init`, `counter-relocate`, `counter-migrate`, `counter-status` and `build` commands produce validated metadata or shared
 linker flags. Applications call `versioning.CurrentBuild()`; startup never
 allocates or accesses a store. Optional `Info.OverallBuildNumber` and
 `Info.BuildCounterID` preserve zero/empty unknown defaults. A known number is

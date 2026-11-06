@@ -1,6 +1,6 @@
 ---
 name: go-versioning
-description: Apply the full date/PR application identity when integrating or releasing apps using go-versioning, or when the user requests the shared CORE+YYYYMMDD.PR convention. Keep package-manager coordinates separate from displayed app versions.
+description: Apply shared go-versioning application identities and canonical-main VERSION counters, including build integration, explicit seed/location migration, readonly compliance checks and release/installation verification. Keep runtime metadata readonly and package-manager coordinates separate from displayed app versions.
 ---
 
 # Full application versions
@@ -52,8 +52,9 @@ Keep any separately approved module-release coordinates explicit.
 ## Overall build counters
 
 Use the released shared `buildcounter` API/CLI for explicit build-time allocation.
-Use `VERSION` for the one-line current overall build number inside one external
-live authority, separate from `CORE+YYYYMMDD.PR`. Never hand-edit/reset it or create
+Use `VERSION` for the one-line current overall build number at the permanent
+canonical main checkout root (I: in the maintained Windows layout), separate from
+`CORE+YYYYMMDD.PR`. Journals/locks/receipts remain external on V:. Never hand-edit/reset it or create
 independent checkout/cloud-sync copies claiming one sequence.
 
 Before adoption, investigate Git history, legacy VERSION/build files, scripts and
@@ -65,9 +66,9 @@ integration HEAD. Record exact commit, count, command, method and check time; ne
 use `--all`, first-parent counts or recompute on each build. This is continuity
 policy, not proof of historical build attempts.
 
-Use `counter-init --seed-file` / `InitializeSeed` for explicit legacy evidence, or
+Use `counter-init --seed-file` / `InitializeSeedAt` for explicit legacy evidence, or
 `--seed-commits --branch main --evidence` for the investigated Git fallback. Existing
-authorities use `counter-migrate` / `Migrate`, never manual edits. The migration adds
+authorities use `counter-migrate` / `Migrate` only for baseline adoption, never manual edits. The migration adds
 the baseline to all attempts observed under lock, preserving original reservations,
 retry numbers/timestamps and artifacts. Inspect existing VERSION release strings
 and migrate their consumers deliberately; never blindly overwrite them. Upgrade
@@ -75,6 +76,33 @@ all builders: old allocators reject the migrated schema. Failed builds consume
 reservations; exact allocation retries retain their original number/time. A new
 compile invocation uses a new request ID. All cooperating checkouts/CI must use
 the same live store; cloud-sync/independent stores cannot claim one global order.
+Use shared `counter-check` / `CheckLocation` plus `Repository.CheckCounterFiles`
+for the standard gate: validate primary main, untracked+ignored operational files,
+ownership and full history. CLI build rejects old placement. Init/relocate require
+explicit --main-repo before creating state; do not silently edit ignore rules or
+untrack/overwrite legacy VERSION.
+For location correction use `counter-relocate` / `RelocateVersion`: preserve current
+number, ID, baseline, receipt bytes and retries; allocate/reseed nothing. Missing root
+VERSION before relocation is expected: the shared operation creates it at the existing
+value (e.g.27), never a placeholder/new seed. Use counter-status and counter-check
+preflight (legacy-layout diagnostic is expected), then counter-relocate, then require
+counter-check success before production allocation/publication. Main VERSION
+and VERSION.authority.json are bound operational files; review ignore rules and
+preserve conflicting tracked/release identities deliberately. Builds from temporary
+worktrees use primary permanent main. For separate build checkouts, --main-repo must
+name the real primary main on the allocator host; verify the actual mount/project.
+WSL/SSH/CI must reach that same host/file, never writable aliases/copies. A Linux
+authority can stay there only if it can write the actual mounted I: canonical root.
+If not, cutover is blocked; journal/host migration is a separate preservation task.
+Read [location adoption](https://github.com/marcuoli/go-versioning/blob/main/docs/counter-location.md).
+Allocation/migration tests must use a standalone isolated Git primary-main fixture;
+a linked worktree of live source still resolves real main. Never bind a temporary
+journal to real application source/main in tests. Readonly metadata tests may use
+real source. Record official pin/source, actual main/host/journal, tracking policy,
+shared check proof and preserved number/ID/receipt continuity for adoption.
+Readonly source-only libraries need no unused authority/VERSION; tests, disposable
+CI showcase binaries and source archives do not allocate. Reserve only for a defined
+owned artifact-production entry point intended for use/distribution.
 Read the [counter contract](https://github.com/marcuoli/go-versioning/blob/main/docs/build-counters.md)
 for failure/recovery and filesystem limits. Keep `BuildCounterID` provenance.
 

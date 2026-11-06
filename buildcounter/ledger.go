@@ -100,11 +100,21 @@ func readHeader(path string) (header, error) {
 	if err := readJSON(filepath.Join(path, "counter.json"), &h); err != nil {
 		return h, err
 	}
-	if (h.Schema != 1 && h.Schema != 2) || !identityPattern.MatchString(h.Application) || !authorityPattern.MatchString(h.CounterID) || h.CreatedTime == "" {
+	if (h.Schema != 1 && h.Schema != 2 && h.Schema != 3) || !identityPattern.MatchString(h.Application) || !authorityPattern.MatchString(h.CounterID) || h.CreatedTime == "" {
 		return h, errors.New("invalid counter authority metadata")
 	}
 	if _, err := versioning.Resolve(versioning.Info{BuildTime: h.CreatedTime}, versioning.Info{}); err != nil {
 		return h, err
+	}
+	if h.Schema == 3 {
+		if h.JournalPath != filepath.Clean(path) {
+			return h, errors.New("authority journal path changed or was copied; resume only on its original host/path")
+		}
+		if !filepath.IsAbs(h.VersionFile) || filepath.Base(h.VersionFile) != "VERSION" || len(h.VersionFile) > 4096 {
+			return h, errors.New("invalid authority-host VERSION path; cross-OS aliases require allocation on the designated host")
+		}
+	} else if h.JournalPath != "" || h.VersionFile != "" || h.VersionPending || h.HadVersion || h.LocatedNumber != 0 {
+		return h, errors.New("legacy schema cannot contain VERSION location state")
 	}
 	directory, err := os.Lstat(filepath.Join(path, "reservations"))
 	if err != nil {
@@ -116,7 +126,8 @@ func readHeader(path string) (header, error) {
 	return h, nil
 }
 
-func (s *Store) ledger(ctx context.Context) ([]Reservation, error) {
+func (s *Store) ledger(ctx context.Context) ([]Reservation, error) { return s.ledgerState(ctx, true) }
+func (s *Store) ledgerState(ctx context.Context, verifyVersion bool) ([]Reservation, error) {
 	h, err := readHeader(s.path)
 	if err != nil {
 		return nil, err
@@ -170,12 +181,17 @@ func (s *Store) ledger(ctx context.Context) ([]Reservation, error) {
 		requests[r.RequestID] = true
 		records = append(records, r)
 	}
-	if h.Schema == 2 {
+	if verifyVersion && h.Schema >= 2 {
 		last, err := lastNumber(b.Seed.Number, uint64(len(records)))
 		if err != nil {
 			return nil, err
 		}
-		if err = s.checkVersion(last, false); err != nil {
+		if h.Schema == 3 {
+			err = s.checkLocation(h, last)
+		} else {
+			err = s.checkVersion(last, false)
+		}
+		if err != nil {
 			return nil, err
 		}
 	}

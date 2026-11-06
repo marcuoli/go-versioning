@@ -31,7 +31,7 @@ func TestCounterSeedCLIAndOneTimeCommitFallback(t *testing.T) {
 		return out.String(), code
 	}
 	store := filepath.Join(root, "counter")
-	base := []string{"--repo", repo, "--store", store, "--app", "example", "--json"}
+	base := []string{"--repo", repo, "--main-repo", repo, "--store", store, "--app", "example", "--json"}
 	args := append([]string{"counter-init"}, base...)
 	args = append(args, "--seed-commits", "--evidence", "legacy VERSION, hooks and scripts inspected: no prior computation/value")
 	out, code := invoke(args...)
@@ -67,20 +67,26 @@ func TestCounterSeedCLIAndOneTimeCommitFallback(t *testing.T) {
 		t.Fatal(out)
 	}
 	other := filepath.Join(root, "invalid")
-	args = []string{"counter-init", "--repo", repo, "--store", other, "--app", "example", "--seed-commits"}
+	args = []string{"counter-init", "--repo", repo, "--main-repo", repo, "--store", other, "--app", "example", "--seed-commits"}
 	if _, code = invoke(args...); code != 2 {
 		t.Fatal("missing investigation admitted")
 	}
 	if _, e := os.Stat(other); !os.IsNotExist(e) {
 		t.Fatal("invalid seed created state")
 	}
+	repo = filepath.Join(root, "legacy-app")
+	if e := os.Mkdir(repo, 0700); e != nil {
+		t.Fatal(e)
+	}
+	cliGit(t, repo, "init", "-b", "main")
+	cliGit(t, repo, "commit", "--allow-empty", "-m", "legacy fixture")
 	legacy := buildcounter.Seed{Number: 70, Method: "legacy", Commit: cliGit(t, repo, "rev-parse", "HEAD"), Command: "legacy hook inspection", Evidence: "verified historical third component increments on commits", CheckedTime: "2026-11-05T20:00:00Z"}
 	data, _ := json.Marshal(legacy)
 	seed := filepath.Join(root, "legacy.json")
 	if e := os.WriteFile(seed, data, 0600); e != nil {
 		t.Fatal(e)
 	}
-	args = []string{"counter-init", "--repo", repo, "--store", other, "--app", "example", "--json"}
+	args = []string{"counter-init", "--repo", repo, "--main-repo", repo, "--store", other, "--app", "example", "--json"}
 	if _, code = invoke(args...); code != 0 {
 		t.Fatal("init")
 	}

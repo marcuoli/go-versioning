@@ -30,6 +30,16 @@ func cliGit(t *testing.T, dir string, args ...string) string {
 	if err != nil {
 		t.Fatalf("git %s failed: %v: %s", args[0], err, out)
 	}
+	// Standalone fixtures explicitly ignore mutable counter state, matching the
+	// shared policy. Tests for legacy tracking override this fixture setup.
+	if len(args) > 0 && args[0] == "init" {
+		file := filepath.Join(dir, ".git", "info", "exclude")
+		if _, e := os.Stat(file); e == nil {
+			if e = os.WriteFile(file, []byte("/VERSION\n/VERSION.authority.json\n"), 0600); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
 	return strings.TrimSpace(string(out))
 }
 

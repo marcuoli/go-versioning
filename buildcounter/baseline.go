@@ -65,7 +65,7 @@ func InitializeSeed(ctx context.Context, path, application string, seed Seed) (*
 	if err := seed.validate(); err != nil {
 		return nil, err
 	}
-	return initialize(ctx, path, application, &seed)
+	return initialize(ctx, path, application, &seed, "")
 }
 
 // Migrate adds a one-time baseline to every tracked attempt present under the
@@ -106,7 +106,7 @@ func (s *Store) Migrate(ctx context.Context, seed Seed) (result Status, err erro
 			return result, errors.New("authority already has a different one-time baseline")
 		}
 		last, e := lastNumber(prior.Seed.Number, uint64(len(records)))
-		return s.status(last, prior, uint64(len(records))), e
+		return s.status(last, prior, uint64(len(records)), h.VersionFile), e
 	}
 	last, err := lastNumber(seed.Number, uint64(len(records)))
 	if err != nil {
@@ -131,7 +131,9 @@ func (s *Store) Migrate(ctx context.Context, seed Seed) (result Status, err erro
 	// Publish intent first. Old schema1 writers now reject the authority, and
 	// current writers require this exact receipt plus matching VERSION. Any
 	// interrupted step fails closed, even if a pre-upgrade process resumes.
-	h.Schema = 2
+	if h.Schema < 3 {
+		h.Schema = 2
+	}
 	h.BaselineSHA256 = hex.EncodeToString(digest[:])
 	if err = replaceJSON(filepath.Join(s.path, "counter.json"), h); err != nil {
 		return result, err
@@ -143,10 +145,10 @@ func (s *Store) Migrate(ctx context.Context, seed Seed) (result Status, err erro
 		return result, err
 	}
 
-	return s.status(last, receipt, uint64(len(records))), nil
+	return s.status(last, receipt, uint64(len(records)), h.VersionFile), nil
 }
-func (s *Store) status(last uint64, b baseline, attempts uint64) Status {
-	status := Status{Application: s.application, CounterID: s.id, LastNumber: last, TrackedAttempts: attempts}
+func (s *Store) status(last uint64, b baseline, attempts uint64, versionFile string) Status {
+	status := Status{Application: s.application, CounterID: s.id, LastNumber: last, TrackedAttempts: attempts, VersionFile: versionFile, LocationCompliant: versionFile != ""}
 	if b.Seed.Method != "" {
 		seed := b.Seed
 		status.Baseline = &seed
@@ -183,7 +185,7 @@ func (s *Store) readBaseline(h header) (baseline, error) {
 		}
 		return b, nil
 	}
-	if h.Schema != 2 {
+	if h.Schema != 2 && h.Schema != 3 {
 		return b, errors.New("legacy header cannot contain a baseline")
 	}
 	if err := readJSON(path, &b); err != nil {
@@ -205,7 +207,17 @@ func (s *Store) readBaseline(h header) (baseline, error) {
 	return b, b.Seed.validate()
 }
 func (s *Store) checkVersion(last uint64, optional bool) error {
+	h, err := readHeader(s.path)
+	if err != nil {
+		return err
+	}
 	path := filepath.Join(s.path, "VERSION")
+	if h.Schema == 3 {
+		path = h.VersionFile
+	}
+	return checkNumberFile(path, last, optional)
+}
+func checkNumberFile(path string, last uint64, optional bool) error {
 	stat, err := os.Lstat(path)
 	if optional && errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -226,7 +238,15 @@ func (s *Store) checkVersion(last uint64, optional bool) error {
 	return nil
 }
 func (s *Store) replaceVersion(last uint64) error {
-	return replaceBytes(filepath.Join(s.path, "VERSION"), []byte(fmt.Sprintf("%d\n", last)))
+	h, err := readHeader(s.path)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(s.path, "VERSION")
+	if h.Schema == 3 {
+		path = h.VersionFile
+	}
+	return replaceBytes(path, []byte(fmt.Sprintf("%d\n", last)))
 }
 
 // Stage a synced file beside its destination, then publish by rename under the

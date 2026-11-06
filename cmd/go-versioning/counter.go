@@ -35,11 +35,13 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	fs.SetOutput(io.Discard)
 	var repoPath, storePath, app, id, version, commit, format, branch, bump, initial string
 	var release, seedCommits bool
-	var seedFile, evidence string
+	var seedFile, evidence, mainRepo, mainBranch string
 	var timeout time.Duration
 	fs.StringVar(&repoPath, "repo", "", "explicit repository root")
 	fs.StringVar(&storePath, "store", "", "absolute external counter store")
 	fs.StringVar(&app, "app", "", "stable application identity")
+	fs.StringVar(&mainRepo, "main-repo", "", "designated primary permanent main root on this authority host")
+	fs.StringVar(&mainBranch, "main-branch", "main", "primary integration branch")
 	fs.BoolVar(&machine, "json", machine, "JSON output/errors")
 	fs.DurationVar(&timeout, "timeout", 30*time.Second, "operation deadline")
 	if command == "counter-init" || command == "counter-migrate" {
@@ -70,6 +72,9 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	if fs.NArg() != 0 || repoPath == "" || storePath == "" || app == "" || timeout <= 0 {
 		return fail(2, errors.New("--repo, --store, --app and a positive timeout are required; no positional arguments"), nil)
 	}
+	if (command == "counter-init" || command == "counter-relocate") && mainRepo == "" {
+		return fail(2, errors.New("--main-repo is required for initialization/relocation; use real permanent main for adoption and a standalone isolated Git main for disposable tests"), nil)
+	}
 	if !filepath.IsAbs(storePath) {
 		return fail(2, errors.New("--store must be an explicit absolute external path"), nil)
 	}
@@ -91,21 +96,54 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	if err = externalStore(repoPath, storePath); err != nil {
 		return fail(2, err, nil)
 	}
-	if command == "counter-init" || command == "counter-migrate" || command == "counter-status" {
+	if command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "counter-relocate" || command == "counter-check" {
 		var store *buildcounter.Store
 		var status buildcounter.Status
-		if command == "counter-status" {
+		var root string
+		if command == "counter-init" || command == "counter-relocate" || command == "counter-check" {
+			root, err = counterMain(ctx, repository, mainRepo, mainBranch)
+			if err != nil {
+				return fail(2, err, nil)
+			}
+			if err = externalStore(root, storePath); err != nil {
+				return fail(2, err, nil)
+			}
+		}
+		if command == "counter-check" {
+			store, err = buildcounter.Open(storePath, app)
+			if err == nil {
+				status, err = store.CheckLocation(ctx, filepath.Join(root, "VERSION"))
+			}
+		} else if command == "counter-relocate" {
+			store, err = buildcounter.Open(storePath, app)
+			if err == nil {
+				status, err = store.RelocateVersion(ctx, filepath.Join(root, "VERSION"))
+			}
+		} else if command == "counter-status" {
 			store, err = buildcounter.Open(storePath, app)
 		} else {
-			seed, e := counterSeed(ctx, repository, seedFile, seedCommits, branch, evidence)
+			seedRepo := repository
+			if seedCommits {
+				if root == "" {
+					root, err = counterMain(ctx, repository, mainRepo, mainBranch)
+					if err != nil {
+						return fail(2, err, nil)
+					}
+				}
+				seedRepo, err = gitversion.NewContext(ctx, root)
+				if err != nil {
+					return fail(1, err, nil)
+				}
+			}
+			seed, e := counterSeed(ctx, seedRepo, seedFile, seedCommits, branch, evidence)
 			if e != nil {
 				return fail(2, e, nil)
 			}
 			if command == "counter-init" {
 				if seed == nil {
-					store, err = buildcounter.Initialize(ctx, storePath, app)
+					store, err = buildcounter.InitializeAt(ctx, storePath, app, filepath.Join(root, "VERSION"))
 				} else {
-					store, err = buildcounter.InitializeSeed(ctx, storePath, app, *seed)
+					store, err = buildcounter.InitializeSeedAt(ctx, storePath, app, filepath.Join(root, "VERSION"), *seed)
 				}
 			} else {
 				if seed == nil {
@@ -120,7 +158,7 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		if err != nil {
 			return fail(1, err, nil)
 		}
-		if command != "counter-migrate" {
+		if command != "counter-migrate" && command != "counter-relocate" && command != "counter-check" {
 			status, err = store.Status(ctx)
 			if err != nil {
 				return fail(1, err, nil)
@@ -172,6 +210,9 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	store, err := buildcounter.Open(storePath, app)
 	if err != nil {
 		return fail(1, err, nil)
+	}
+	if err = checkCounterMain(ctx, store, repository, mainRepo, mainBranch); err != nil {
+		return fail(2, err, nil)
 	}
 	reservation, err := store.Reserve(ctx, buildcounter.Request{ID: id, Version: info.Version, Commit: info.Commit})
 	if err != nil {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1+20261106.12
+
+- **Source PR #12, issue #11:** Bind authoritative numeric `VERSION` to permanent canonical main, with external journals and ownership; add no-allocation location migration preserving counts, authority IDs, baselines, receipts and retries.
+- Add shared readonly placement/tracking checks, require explicit main for initialization/relocation, and bound Windows lock-handoff retries without changing lock ownership.
+- Resolve primary main for linked sources, require explicit real main for separate build checkouts, reject copied/pending authorities and old writers, and document host/filesystem/ignore boundaries.
+
 ## 0.3.0+20261105.9
 
 - **Source PR #9, issue #8:** Manage the overall build number in a locked, atomically replaced external `VERSION`; add explicit evidence-backed seed/migration APIs and CLI, one-time complete canonical HEAD commit fallback, and preserved legacy receipts/retries.

@@ -18,8 +18,10 @@ import (
 const helpText = `go-versioning: application version metadata and immutable Git tags
 
 Usage:
-  go-versioning counter-init --repo DIR --store ABSOLUTE_PATH --app ID [--json]
+  go-versioning counter-init --repo DIR --main-repo MAIN --store ABSOLUTE_PATH --app ID [--json]
   go-versioning counter-migrate --repo DIR --store ABSOLUTE_PATH --app ID (--seed-file JSON | --seed-commits --evidence TEXT) [--json]
+  go-versioning counter-check --repo DIR --store ABSOLUTE_PATH --app ID [--main-repo DIR] [--json]
+  go-versioning counter-relocate --repo DIR --main-repo MAIN --store ABSOLUTE_PATH --app ID [--json]
   go-versioning counter-status --repo DIR --store ABSOLUTE_PATH --app ID [--json]
   go-versioning build --repo DIR --store ABSOLUTE_PATH --app ID --request-id ID [--json | --format ldflags]
   go-versioning inspect --repo DIR [--json]
@@ -46,7 +48,12 @@ Build counter options:
   --evidence TEXT                  Investigation evidence required with --seed-commits
 
 counter-init without a seed begins at VERSION 0; seeded authorities preserve continuity.
-VERSION is one decimal line inside the external authority, separate from release identity.
+VERSION is one decimal line at the permanent primary main root; journals remain external.
+  --main-repo DIR --main-branch main  Explicit canonical primary root/branch on authority host
+counter-relocate preserves all numbers/IDs/receipts, retires old VERSION; no seed/allocation.
+counter-check proves primary main, ignored/untracked operational files, ownership and full history.
+Init/relocate require explicit --main-repo; disposable tests need standalone isolated Git main.
+build rejects legacy placement until counter-relocate succeeds.
 counter-init is explicit; build never auto-initializes or repairs state.
 Failed builds consume reservations. Runtime CurrentBuild never allocates.
 next is read-only. tag creates locally unless --push --remote is supplied.
@@ -87,7 +94,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	command := args[0]
-	if command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "build" {
+	if command == "counter-check" || command == "counter-relocate" || command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "build" {
 		return runCounter(ctx, args, stdout, stderr)
 	}
 	if command != "inspect" && command != "next" && command != "tag" {

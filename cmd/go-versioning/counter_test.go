@@ -33,13 +33,13 @@ func TestCounterCLIExternalAllocationAndRuntimeInjection(t *testing.T) {
 		}
 		return out.String(), code
 	}
-	if _, code := invoke("counter-init", "--repo", repo, "--store", filepath.Join(repo, "state"), "--app", "example", "--json"); code != 2 {
+	if _, code := invoke("counter-init", "--repo", repo, "--main-repo", repo, "--store", filepath.Join(repo, "state"), "--app", "example", "--json"); code != 2 {
 		t.Fatal("accepted source-local counter")
 	}
 	if _, err := os.Stat(filepath.Join(repo, "state")); !os.IsNotExist(err) {
 		t.Fatal("source-local admission created state")
 	}
-	if _, code := invoke("counter-init", "--repo", repo, "--store", store, "--app", "example", "--json"); code != 0 {
+	if _, code := invoke("counter-init", "--repo", repo, "--main-repo", repo, "--store", store, "--app", "example", "--json"); code != 0 {
 		t.Fatal("counter-init failed")
 	}
 	args := []string{"build", "--repo", repo, "--store", store, "--app", "example", "--request-id", "one", "--json"}
@@ -93,6 +93,9 @@ func TestBuildCounterCLIRequiresVerifiedReleaseBeforeReserving(t *testing.T) {
 		t.Fatal(err)
 	}
 	cliGit(t, repo, "init", "-b", "main")
+	if err := os.WriteFile(filepath.Join(repo, ".git", "info", "exclude"), []byte("/VERSION\n/VERSION.authority.json\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(repo, "source.txt"), []byte("fixture"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +111,7 @@ func TestBuildCounterCLIRequiresVerifiedReleaseBeforeReserving(t *testing.T) {
 		}
 		return out.String(), code
 	}
-	if _, code := invoke("counter-init", "--repo", repo, "--store", store, "--app", "example", "--json"); code != 0 {
+	if _, code := invoke("counter-init", "--repo", repo, "--main-repo", repo, "--store", store, "--app", "example", "--json"); code != 0 {
 		t.Fatal("initialize")
 	}
 	args := []string{"build", "--repo", repo, "--store", store, "--app", "example", "--request-id", "release-one", "--version", "1.2.3+20260102.42", "--json"}

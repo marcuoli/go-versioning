@@ -23,17 +23,20 @@ those fields but do not authenticate an allocation against a live store.
 
 Use the public `buildcounter` package only in build tooling. Supply a stable
 application ID and an absolute external store path. The parent must already exist.
-`Initialize` exclusively creates a new store; `Open` never creates/reset state.
+`InitializeAt`/`InitializeSeedAt` explicitly create a new store bound to main VERSION;
+`Open` never creates/resets state. Legacy initialization APIs remain compatible.
 The CLI also requires an explicit repository and rejects source-local stores.
 Store permissions and access are the operator's responsibility; only trusted,
 cooperating builders may write it.
 
-New authorities use schema2 and `VERSION`: one canonical decimal line followed by
-LF, representing the current overall number. This file lives inside the single
-external authority, never in independent checkout/cloud-sync replicas. Its view is
-validated against the complete history and replaced under the same lock using a
-synced adjacent staging file and rename. Supported filesystems must provide atomic
-replacement/visibility; verify the actual filesystem. Direct edits are forbidden.
+New CLI authorities use schema3: one numeric `VERSION` at the permanent canonical
+main checkout root (I: in the maintained Windows layout), with adjacent
+`VERSION.authority.json` ownership. Journals/lock/receipts remain external on V:.
+All builders reach that one host-native main file, never checkout/cloud copies.
+The value is validated against full history and atomically replaced under the same
+lock. Read [location migration and host reachability](counter-location.md) before
+adoption. `counter-relocate` moves an existing authority's file without allocating,
+reseeding or changing IDs/baselines/receipts/retries; the former file is retired.
 
 The store contains authority metadata, an append-only `issued.log`,
 immutable numbered JSON reservations, and a temporary exclusive directory lock.
@@ -41,10 +44,10 @@ All cooperating allocators use the same lock and validate the complete sequence
 and ledger before allocation. Issuance is synced before the reservation file;
 the complete reservation file is synced before success is acknowledged. This
 separate sequence detects a missing reservation tail rather than reusing a number.
-Canonical JSON rejects duplicate/unknown fields and ambiguous edits. Schema1
-authorities remain readable/writable without automatic migration. Explicit migration
-upgrades their header to schema2; older library/CLI versions reject schema2 rather
-than ignoring VERSION or a baseline. Upgrade all builders before migration.
+Canonical JSON rejects duplicate/unknown fields and ambiguous edits. Schema1/2
+authorities remain compatible until explicit relocation. Schema3 binds the original
+journal and permanent main file; older binaries reject it. Upgrade all builders
+before migration. Baseline migration preserves an existing schema3 binding.
 Records are bounded; the ledger is never silently truncated to a prefix.
 
 Concurrency is supported across processes/checkouts using the **same live store**
@@ -67,7 +70,8 @@ filesystem and hardware. Preserve the whole store and external build journals.
 
 Allocate once before invoking the project-owned artifact build: compilation or an
 explicit release package/archive invocation. Imports and downstream dependency
-compilation do not allocate this project's number. Ordinary tests, startup,
+compilation do not allocate this project's number. Disposable validation-only CI
+executables and automatic source archives do not allocate. Ordinary tests, startup,
 planning/version queries and tagging alone remain read-only.
 
 Allocate once before invoking the compiler. All targets/packages belonging to
@@ -99,7 +103,7 @@ uncertain tail or restore an older active sequence merely to make allocation pas
 
 ## Explicit seed and migration
 
-Use `InitializeSeed(ctx, path, app, Seed)` for a new seeded authority, or
+Use `InitializeSeedAt(ctx, path, app, mainVersionFile, Seed)` for a new seeded authority, or
 `store.Migrate(ctx, Seed)` for an existing authority. A Seed contains `number`
 (uint64), `method` (`legacy` or `git-commits`), full `commit`, `command`, investigation
 `evidence` and RFC3339 `checked_time`. Evidence must establish the previous method
@@ -125,7 +129,8 @@ later `checked_time` retains the original receipt/time; every other seed field m
 match. Status includes the original baseline evidence and tracked-attempt count.
 Overflow, missing VERSION/receipt, a changed receipt, conflicting evidence or an
 interrupted publication fails closed. Seeded initialization publishes its header only after the receipt and VERSION.
-Migration publishes a schema2 header binding the expected receipt first, so old
+Baseline migration publishes a header binding the expected receipt first, preserving
+schema3 location when present, so old
 and new writers reject any incomplete transaction. A crash between files is
 retained for deliberate recovery, never
 automatically adopted or repaired. Preserve the entire authority and stop/verify all
@@ -133,7 +138,8 @@ writers before operator recovery. Never delete a receipt or reset a sequence.
 
 An existing VERSION containing a full release identity is not a numeric counter.
 Inspect and preserve it and its consumers deliberately before adoption. This CLI
-never overwrites a source checkout's VERSION. For a schema1 authority it admits an
+rejects a source VERSION with conflicting content; it only manages the designated
+main numeric file under the ownership contract. For a schema1 authority it admits an
 absent VERSION or the exact previous numeric high-water only; a conflicting number,
 release string or symlink fails without overwriting that file. A separate preserved
 release-identity file may be needed in the owning project's migration workflow.
@@ -151,7 +157,7 @@ go-versioning counter-migrate --repo /src/example-app \
   --seed-file /srv/build-data/example-app/legacy-seed.json --json
 
 # New authority: only after investigation found no existing method/value.
-go-versioning counter-init --repo /src/new-app \
+go-versioning counter-init --repo /src/new-app --main-repo /src/new-app \
   --store /srv/build-data/new-app/counter --app new-app \
   --seed-commits --branch main \
   --evidence "history, VERSION/build files, scripts and hooks inspected; no prior sequence" --json
@@ -174,7 +180,7 @@ Use an explicit external parent and source root. These are synthetic paths:
 ```sh
 mkdir -p /srv/build-data/example-app
 
-go-versioning counter-init --repo /src/example-app \
+go-versioning counter-init --repo /src/example-app --main-repo /src/example-app \
   --store /srv/build-data/example-app/counter --app example-app --json
 
 # Persist this ID for retries of this allocation; choose a new ID per invocation.
@@ -225,7 +231,7 @@ renders metadata; it does not allocate or validate a historical baseline.
 ```go
 store, err := buildcounter.Open(absoluteStore, "example-app")
 if err != nil {
-    return err // Initialize is a separate explicit one-time operation.
+    return err // InitializeSeedAt/InitializeAt is a separate explicit one-time operation.
 }
 reservation, err := store.Reserve(ctx, buildcounter.Request{
     ID: attemptID, Version: sourceInfo.Version, Commit: sourceInfo.Commit,

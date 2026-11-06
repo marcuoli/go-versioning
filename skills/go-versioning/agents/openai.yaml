@@ -1,4 +1,4 @@
 interface:
   display_name: "go-versioning"
-  short_description: "Keep full date/PR app versions consistent"
-  default_prompt: "Use $go-versioning to apply the full app version identity and verify its release and installation coordinates."
+  short_description: "Use full app versions and main-root counters"
+  default_prompt: "Use $go-versioning to apply the full app identity and canonical-main VERSION contract, verify shared authority checks or explicit migration, and confirm release/installation coordinates without runtime allocation."

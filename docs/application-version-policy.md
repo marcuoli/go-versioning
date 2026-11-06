@@ -103,7 +103,10 @@ publish anything, or replace the full displayed app/release identity.
 ## Overall build-number continuity
 
 Keep `CORE+YYYYMMDD.PR` separate from the overall build number. The shared allocator
-manages the latter as a one-line numeric `VERSION` inside one external authority.
+manages the latter as a one-line numeric `VERSION` at the permanent canonical main
+checkout root (I: in the maintained layout). Journals/lock/receipts remain external
+on V:. Use [location-only migration](counter-location.md) for existing authorities;
+it never allocates, reseeds or changes IDs/receipts/retries.
 Before initialization, inspect existing VERSION/build files, history, scripts and
 hooks and preserve the verified prior sequence/value with evidence. If none exists,
 the explicitly approved fallback is the one-time total unique commits reachable
