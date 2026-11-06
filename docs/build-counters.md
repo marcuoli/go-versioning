@@ -71,7 +71,7 @@ filesystem and hardware. Preserve the whole store and external build journals.
 Allocate once before invoking the project-owned artifact build: compilation or an
 explicit release package/archive invocation. Imports and downstream dependency
 compilation do not allocate this project's number. Disposable validation-only CI
-executables and automatic source archives do not allocate. Ordinary tests, startup,
+executables and automatic hosting source archives do not allocate. Ordinary tests, startup,
 planning/version queries and tagging alone remain read-only.
 
 Allocate once before invoking the compiler. All targets/packages belonging to
@@ -248,3 +248,8 @@ cancellation cannot interrupt an OS file sync. The default CLI deadline is 30s.
 The ledger is fully validated on each reservation, so cost grows with history;
 no rows are discarded for speed. Capacity/storage migrations need their own
 reviewed preservation procedure.
+
+A reviewed project-owned library compilation or explicit release-source-package
+workflow may reserve once at its defined logical artifact-production boundary.
+Automatic hosting archives remain excluded. Preserve all already-issued attempts,
+receipts and baseline continuity; this classification never erases/reseeds history.

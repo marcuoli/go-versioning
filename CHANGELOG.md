@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.3.1+20261106.12
+## 0.3.1+20261106.13
 
-- **Source PR #12, issue #11:** Bind authoritative numeric `VERSION` to permanent canonical main, with external journals and ownership; add no-allocation location migration preserving counts, authority IDs, baselines, receipts and retries.
+- **Source PRs #12/#13, issue #11:** Bind authoritative numeric `VERSION` to permanent canonical main, with external journals and ownership; add no-allocation location migration preserving counts, authority IDs, baselines, receipts and retries.
+- Clarify one allocation rule for automatic hosting archives versus reviewed owned library compilation/release-source packaging; preserve all historical receipts.
 - Add shared readonly placement/tracking checks, require explicit main for initialization/relocation, and bound Windows lock-handoff retries without changing lock ownership.
 - Resolve primary main for linked sources, require explicit real main for separate build checkouts, reject copied/pending authorities and old writers, and document host/filesystem/ignore boundaries.
 

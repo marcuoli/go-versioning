@@ -101,8 +101,10 @@ journal to real application source/main in tests. Readonly metadata tests may us
 real source. Record official pin/source, actual main/host/journal, tracking policy,
 shared check proof and preserved number/ID/receipt continuity for adoption.
 Readonly source-only libraries need no unused authority/VERSION; tests, disposable
-CI showcase binaries and source archives do not allocate. Reserve only for a defined
-owned artifact-production entry point intended for use/distribution.
+CI showcase binaries and automatic hosting source archives do not allocate. Reserve only for a defined
+owned artifact-production entry point intended for use/distribution, including a
+reviewed owned library-compile or explicit release-source-package workflow. Never
+reinterpret, remove or reseed already-issued attempts when classifying future work.
 Read the [counter contract](https://github.com/marcuoli/go-versioning/blob/main/docs/build-counters.md)
 for failure/recovery and filesystem limits. Keep `BuildCounterID` provenance.
 

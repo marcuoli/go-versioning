@@ -3,8 +3,8 @@
 Reusable application version metadata and immutable Git tag allocation, using only the Go standard library.
 
 ```sh
-go get github.com/marcuoli/go-versioning@v0.3.1+20261106.12
-go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.3.1+20261106.12
+go get github.com/marcuoli/go-versioning@v0.3.1+20261106.13
+go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.3.1+20261106.13
 ```
 
 Requires Go 1.27.3 or later. Repository operations also require Git.

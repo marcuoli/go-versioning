@@ -131,7 +131,7 @@ Filesystem visibility/atomic replacement and power-loss behavior need qualificat
 on the actual mount; local tests do not certify arbitrary network filesystems.
 
 Readonly libraries, imports, planning/startup/tagging, tests, disposable CI showcase
-executables and automatic source archives do not allocate. Only a deliberately defined
+executables and automatic hosting source archives do not allocate. Only a deliberately defined
 artifact-production entry point for output intended for use/distribution reserves once
 per logical build/matrix. A source-only module may have no authority or VERSION until
 that boundary exists; do not create unused state to satisfy a layout example.
@@ -154,3 +154,8 @@ new CLI build rejects legacy V: placement. Preserve existing root release-file
 semantics in an owning-project PR before cutover; a conflict is actionable, never
 permission to create a replacement counter. Source-only/no-authority is explicitly
 N/A for location checks and must not fabricate VERSION merely to pass a checklist.
+
+A reviewed project-owned library compilation or explicit release-source-package
+workflow may reserve once at its defined logical artifact-production boundary.
+Automatic hosting archives remain excluded. Preserve all already-issued attempts,
+receipts and baseline continuity; this classification never erases/reseeds history.
