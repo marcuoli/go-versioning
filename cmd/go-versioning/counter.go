@@ -37,6 +37,7 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	var release, seedCommits bool
 	var seedFile, evidence, mainRepo, mainBranch string
 	var timeout time.Duration
+	var recovery buildcounter.RecoveryOptions
 	fs.StringVar(&repoPath, "repo", "", "explicit repository root")
 	fs.StringVar(&storePath, "store", "", "absolute external counter store")
 	fs.StringVar(&app, "app", "", "stable application identity")
@@ -49,6 +50,12 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		fs.BoolVar(&seedCommits, "seed-commits", false, "one-time canonical HEAD reachable-commit fallback")
 		fs.StringVar(&branch, "branch", "main", "canonical integration branch for commit fallback")
 		fs.StringVar(&evidence, "evidence", "", "legacy investigation evidence for commit fallback")
+	}
+	if command == "counter-recover" {
+		fs.StringVar(&recovery.CounterID, "counter-id", "", "expected existing authority identity")
+		fs.Uint64Var(&recovery.CurrentNumber, "expected-current", 0, "expected lagging VERSION value")
+		fs.Uint64Var(&recovery.LastNumber, "expected-last", 0, "expected complete ledger high-water mark")
+		fs.BoolVar(&recovery.Apply, "apply", false, "apply verified recovery after preserving its receipt")
 	}
 	if command == "build" {
 		fs.StringVar(&id, "request-id", "", "unique logical build-attempt ID")
@@ -72,11 +79,18 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	if fs.NArg() != 0 || repoPath == "" || storePath == "" || app == "" || timeout <= 0 {
 		return fail(2, errors.New("--repo, --store, --app and a positive timeout are required; no positional arguments"), nil)
 	}
-	if (command == "counter-init" || command == "counter-relocate") && mainRepo == "" {
-		return fail(2, errors.New("--main-repo is required for initialization/relocation; use real permanent main for adoption and a standalone isolated Git main for disposable tests"), nil)
+	if (command == "counter-init" || command == "counter-relocate" || command == "counter-recover") && mainRepo == "" {
+		return fail(2, errors.New("--main-repo is required for initialization/relocation/recovery; use real permanent main for adoption and a standalone isolated Git main for disposable tests"), nil)
 	}
 	if !filepath.IsAbs(storePath) {
 		return fail(2, errors.New("--store must be an explicit absolute external path"), nil)
+	}
+	if command == "counter-recover" {
+		present := map[string]bool{}
+		fs.Visit(func(f *flag.Flag) { present[f.Name] = true })
+		if !present["expected-current"] || !present["expected-last"] || recovery.CounterID == "" {
+			return fail(2, errors.New("recovery requires --counter-id, --expected-current and --expected-last"), nil)
+		}
 	}
 	if command == "build" && (id == "" || (format != "text" && format != "json" && format != "ldflags")) {
 		return fail(2, errors.New("build requires --request-id and --format text|json|ldflags"), nil)
@@ -95,6 +109,33 @@ func runCounter(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	}
 	if err = externalStore(repoPath, storePath); err != nil {
 		return fail(2, err, nil)
+	}
+	if command == "counter-recover" {
+		root, err := counterMain(ctx, repository, mainRepo, mainBranch)
+		if err != nil {
+			return fail(2, err, nil)
+		}
+		if err = externalStore(root, storePath); err != nil {
+			return fail(2, err, nil)
+		}
+		store, err := buildcounter.Open(storePath, app)
+		if err != nil {
+			return fail(1, err, nil)
+		}
+		recovery.VersionFile = filepath.Join(root, "VERSION")
+		result, err := store.RecoverVersion(ctx, recovery)
+		if err != nil {
+			return fail(1, err, nil)
+		}
+		if machine {
+			err = json.NewEncoder(stdout).Encode(result)
+		} else {
+			_, err = fmt.Fprintf(stdout, "Counter ID: %s\nVERSION: %d -> %d\nApplied: %t\nAlready recovered: %t\nReceipt: %s\n", result.CounterID, result.PreviousNumber, result.LastNumber, result.Applied, result.AlreadyRecovered, result.ReceiptFile)
+		}
+		if err != nil {
+			return fail(1, errors.New("could not write recovery output; inspect authority before retrying"), nil)
+		}
+		return 0
 	}
 	if command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "counter-relocate" || command == "counter-check" {
 		var store *buildcounter.Store

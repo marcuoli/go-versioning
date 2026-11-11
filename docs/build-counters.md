@@ -253,3 +253,40 @@ A reviewed project-owned library compilation or explicit release-source-package
 workflow may reserve once at its defined logical artifact-production boundary.
 Automatic hosting archives remain excluded. Preserve all already-issued attempts,
 receipts and baseline continuity; this classification never erases/reseeds history.
+
+## Recovering a lagging primary VERSION
+
+If a restored primary checkout has an older numeric `VERSION`, stop all builders
+and non-cooperating writers (including cloud synchronization) and preserve the
+complete authority and original file first. A filesystem lock cannot fence a
+cloud client. Do not copy a conflict file over the authority, reseed, or truncate
+history.
+
+Use `counter-recover` with the independently verified counter ID, exact current
+number and complete journal high-water mark. Preview is the default:
+
+```text
+go-versioning counter-recover --repo APP --main-repo MAIN --store JOURNAL --app example --counter-id ID --expected-current 7 --expected-last 9 --json
+```
+
+After inspecting the plan, repeat with `--apply`. The CLI verifies the designated
+primary main and ignored/untracked operational files. The schema-3 API validates
+ownership, relocation evidence, the baseline, all reservations and the independent
+issued sequence under the normal authority lock. It accepts only a strictly
+lagging, canonical decimal file. Incomplete/corrupt history, a different identity
+or location, an ahead value or changed expectations remain blockers.
+
+Before replacing `VERSION`, apply writes an immutable
+`version-recovery-7-9.json` receipt containing the original bytes, identity,
+location, expected numbers and recovery time. Preserve this receipt with the
+journal. An exact retry can resume after receipt publication or report an already
+completed repair; it fails if allocation has since advanced the expected ledger.
+No number is allocated, and allocation receipts, baseline, counter identity and
+issued sequence stay unchanged. Normal allocation and status still reject a
+rollback until explicit recovery completes. Run `counter-check` afterwards.
+
+The public `Store.RecoverVersion` API has the same preview/apply semantics. Its
+caller must verify the permanent main root and stop external writers; the CLI
+supplies the Git checks. Recovery trusts a complete existing authority, not an
+independently reconstructed history or proof against wholesale rollback of both
+journal and file.

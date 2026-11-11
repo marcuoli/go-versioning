@@ -120,3 +120,9 @@ Apply this to the requested app. Preserve published tags/releases and unrelated
 work; do not mass-edit consumers. Check the owning repository's issue, review,
 changelog and release requirements. This skill grants no permission to merge,
 publish, rewrite history, create tags or message other chats.
+
+For a lagging schema-3 primary `VERSION` with complete authority history, use the
+explicit `counter-recover` preview/apply workflow in `docs/build-counters.md`.
+Stop external writers and preserve the authority first; require verified identity
+and exact current/high-water expectations. Never substitute a conflict copy,
+reseed, or use recovery to repair an incomplete journal.

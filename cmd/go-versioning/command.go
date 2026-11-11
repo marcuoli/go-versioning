@@ -22,6 +22,7 @@ Usage:
   go-versioning counter-migrate --repo DIR --store ABSOLUTE_PATH --app ID (--seed-file JSON | --seed-commits --evidence TEXT) [--json]
   go-versioning counter-check --repo DIR --store ABSOLUTE_PATH --app ID [--main-repo DIR] [--json]
   go-versioning counter-relocate --repo DIR --main-repo MAIN --store ABSOLUTE_PATH --app ID [--json]
+  go-versioning counter-recover --repo DIR --main-repo MAIN --store ABSOLUTE_PATH --app ID --counter-id ID --expected-current N --expected-last N [--apply] [--json]
   go-versioning counter-status --repo DIR --store ABSOLUTE_PATH --app ID [--json]
   go-versioning build --repo DIR --store ABSOLUTE_PATH --app ID --request-id ID [--json | --format ldflags]
   go-versioning inspect --repo DIR [--json]
@@ -51,6 +52,7 @@ counter-init without a seed begins at VERSION 0; seeded authorities preserve con
 VERSION is one decimal line at the permanent primary main root; journals remain external.
   --main-repo DIR --main-branch main  Explicit canonical primary root/branch on authority host
 counter-relocate preserves all numbers/IDs/receipts, retires old VERSION; no seed/allocation.
+counter-recover previews a lagging VERSION repair; --apply preserves a receipt before writing.
 counter-check proves primary main, ignored/untracked operational files, ownership and full history.
 Init/relocate require explicit --main-repo; disposable tests need standalone isolated Git main.
 build rejects legacy placement until counter-relocate succeeds.
@@ -94,7 +96,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	command := args[0]
-	if command == "counter-check" || command == "counter-relocate" || command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "build" {
+	if command == "counter-recover" || command == "counter-check" || command == "counter-relocate" || command == "counter-init" || command == "counter-migrate" || command == "counter-status" || command == "build" {
 		return runCounter(ctx, args, stdout, stderr)
 	}
 	if command != "inspect" && command != "next" && command != "tag" {
