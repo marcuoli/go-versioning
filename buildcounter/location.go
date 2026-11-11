@@ -265,13 +265,19 @@ func (s *Store) retireVersion(h header) error {
 	return os.Remove(old)
 }
 func (s *Store) checkLocation(h header, last uint64) error {
+	if e := s.checkLocationEvidence(h); e != nil {
+		return e
+	}
+	return checkNumberFile(h.VersionFile, last, false)
+}
+
+// Recovery reuses placement and retirement checks while verifying the numeric
+// file against its explicit expected prior value instead of the ledger head.
+func (s *Store) checkLocationEvidence(h header) error {
 	if h.VersionPending {
 		return errors.New("VERSION relocation is incomplete; retry counter-relocate with the same main root")
 	}
 	if e := s.checkOwner(h); e != nil {
-		return e
-	}
-	if e := checkNumberFile(h.VersionFile, last, false); e != nil {
 		return e
 	}
 	if _, e := os.Lstat(filepath.Join(s.path, "VERSION")); !errors.Is(e, os.ErrNotExist) {

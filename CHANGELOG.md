@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Issue #14:** Add explicit preview/apply recovery of a lagging primary `VERSION` from fully validated authority history, preserving original bytes, identity and allocation receipts; keep normal allocation fail-closed.
+
 ## 0.3.1+20261106.13
 
 - **Source PRs #12/#13, issue #11:** Bind authoritative numeric `VERSION` to permanent canonical main, with external journals and ownership; add no-allocation location migration preserving counts, authority IDs, baselines, receipts and retries.
