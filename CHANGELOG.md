@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Issue #18:** Require Go 1.27.4 in the module and existing CI, and document the independently verified Go 1.20 source-compatibility floor in README text and badges.
+
 - **Issue #16:** Use Go 1.27.4 for current builds while retaining the verified Go 1.27.3 consumer minimum; test both exact compilers in existing CI, disable automatic switching during validation, and keep validation binaries outside source. The standard-library-only module gains no third-party dependencies. Correct fixture path expectations for hosts with aliased temporary roots, preserving production ownership checks.
 
 - **Issue #14:** Add explicit preview/apply recovery of a lagging primary `VERSION` from fully validated authority history, preserving original bytes, identity and allocation receipts; keep normal allocation fail-closed.

@@ -1,5 +1,8 @@
 # go-versioning
 
+[![Build Go 1.27.4](https://img.shields.io/badge/build_Go-1.27.4-00ADD8?logo=go)](#go-version-compatibility)
+[![Source compatibility Go 1.20](https://img.shields.io/badge/source_compatibility-Go_1.20-00ADD8?logo=go)](#go-version-compatibility)
+
 Reusable application version metadata and immutable Git tag allocation, using only the Go standard library.
 
 ```sh
@@ -7,7 +10,7 @@ go get github.com/marcuoli/go-versioning@v0.3.1+20261106.13
 go install github.com/marcuoli/go-versioning/cmd/go-versioning@v0.3.1+20261106.13
 ```
 
-Requires Go 1.27.3 or later. Repository operations also require Git.
+Requires Go 1.27.4 or later. Repository operations also require Git.
 
 
 ## Public package boundaries
@@ -146,6 +149,22 @@ JSON objects with an `error` field and, where applicable, partial operation
 state. Exit codes: 0 success, 1 operation failure, 2 invalid usage.
 Git subprocesses have finite deadlines and honor cancellation.
 
+## Go version compatibility
+
+| Meaning | Go version |
+| --- | --- |
+| Declared module requirement (`go.mod`) and current builds | 1.27.4 |
+| Verified source compatibility floor | 1.20 |
+
+The source compatibility result comes from an isolated snapshot using a
+temporary Go 1.20 manifest: the initial Go 1.20 compiler passed the complete
+tests and vet on Windows/amd64 and built all six supported targets. Go 1.19
+failed on `errors.Join` and `exec.Cmd.WaitDelay`, introduced in Go 1.20.
+Other targets were cross-built; this does not establish native runtime coverage
+on every platform. The current module declaration requires Go 1.27.4; the
+source compatibility badge does not lower that requirement. Current builds use
+Go 1.27.4 for its security fixes.
+
 ## Integration and development
 
 See [the consumer example](examples/app/main.go), [workflow examples](docs/workflows.md)
@@ -154,16 +173,14 @@ localization, packaging and release notes remain with the consuming application.
 
 ```sh
 bash scripts/validate.sh
-# Select an exact minimum compiler on PATH, then test consumer compatibility.
-bash scripts/validate.sh --go-version=1.27.3
 bash scripts/validate.sh --race
 ```
 
 On Windows use `./scripts/validate.ps1` and optionally `-Race` with an existing
-C compiler. Current builds use Go 1.27.4; consumer compatibility remains Go 1.27.3.
-Select that exact compiler on PATH and pass `-GoVersion 1.27.3` for the minimum
-check. Scripts set `GOTOOLCHAIN=local` so automatic switching cannot hide which
-compiler ran. Both exact versions are tested in Gitea and the GitHub OS matrix.
+C compiler. Select Go 1.27.4 on PATH. Scripts set `GOTOOLCHAIN=local` so
+automatic switching cannot hide which compiler ran. Gitea and the GitHub OS
+matrix validate Go 1.27.4; the lower source-compatibility result is documented
+separately above.
 
 Build output defaults to the project's external V: build namespace on maintained
 Windows/WSL hosts, or the hosted runner's temporary build directory. Set
