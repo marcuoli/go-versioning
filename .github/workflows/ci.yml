@@ -14,6 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        go: ['1.27.3', '1.27.4']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -21,21 +22,21 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
-          go-version: '1.27.3'
+          go-version: ${{ matrix.go }}
           cache: false
       - name: Validate on Linux and macOS
         if: runner.os != 'Windows'
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == Linux ]]; then
-            bash scripts/validate.sh --race
+            bash scripts/validate.sh --race --go-version=${{ matrix.go }}
           else
-            bash scripts/validate.sh
+            bash scripts/validate.sh --go-version=${{ matrix.go }}
           fi
       - name: Validate on Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/validate.ps1
+        run: ./scripts/validate.ps1 -GoVersion ${{ matrix.go }}
 
   cross-build:
     runs-on: ubuntu-latest
@@ -45,7 +46,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Build supported CLI targets
         shell: bash
@@ -56,9 +57,9 @@ jobs:
           GOTOOLCHAIN: 'local'
         run: |
           set -euo pipefail
-          [[ "$(go env GOVERSION)" == go1.27.3 ]]
-          mkdir -p bin
+          [[ "$(go env GOVERSION)" == go1.27.4 ]]
+          mkdir -p "$RUNNER_TEMP/go-versioning-cross"
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
             export GOOS="${target%/*}" GOARCH="${target#*/}"
-            go build -trimpath -buildvcs=false -o "bin/go-versioning-${GOOS}-${GOARCH}" ./cmd/go-versioning
+            go build -trimpath -buildvcs=false -o "$RUNNER_TEMP/go-versioning-cross/go-versioning-${GOOS}-${GOARCH}" ./cmd/go-versioning
           done

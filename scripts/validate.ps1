@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [switch]$BuildOnly,
-    [switch]$Race
+    [switch]$Race,
+    [ValidateSet('1.27.3', '1.27.4')]
+    [string]$GoVersion = '1.27.4',
+    [string]$OutputDirectory = $env:GO_VERSIONING_BUILD_DIR
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +20,7 @@ function Invoke-Go {
     }
 }
 
-$processSettings = @('GOWORK', 'GOFLAGS', 'CGO_ENABLED')
+$processSettings = @('GOWORK', 'GOFLAGS', 'CGO_ENABLED', 'GOTOOLCHAIN')
 $previousSettings = @{}
 foreach ($settingName in $processSettings) {
     $previousSettings[$settingName] = [Environment]::GetEnvironmentVariable($settingName, 'Process')
@@ -25,6 +28,7 @@ foreach ($settingName in $processSettings) {
 
 Push-Location (Split-Path -Parent $PSScriptRoot)
 try {
+    $env:GOTOOLCHAIN = 'local'
     $env:GOWORK = 'off'
     $env:GOFLAGS = '-mod=readonly'
     $env:CGO_ENABLED = '0'
@@ -33,8 +37,8 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to determine the installed Go version.'
     }
-    if ($activeGo -ne 'go1.27.3') {
-        throw ('Go 1.27.3 is required; found {0}.' -f $activeGo)
+    if ($activeGo -ne ('go' + $GoVersion)) {
+        throw ('Go {0} is required; found {1}. Select that compiler explicitly.' -f $GoVersion, $activeGo)
     }
 
     if (-not $BuildOnly) {
@@ -60,11 +64,22 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to determine the build target operating system.'
     }
-    $output = 'bin/go-versioning'
+    if (-not $OutputDirectory) {
+        if (Test-Path -LiteralPath 'V:\Development') {
+            $OutputDirectory = 'V:\Development\go-versioning\artifacts\build\local'
+        }
+        elseif ($env:RUNNER_TEMP) {
+            $OutputDirectory = Join-Path $env:RUNNER_TEMP 'go-versioning-build'
+        }
+        else {
+            throw 'Set -OutputDirectory or GO_VERSIONING_BUILD_DIR to an external build directory.'
+        }
+    }
+    $output = Join-Path $OutputDirectory 'go-versioning'
     if ($targetOS -eq 'windows') {
         $output += '.exe'
     }
-    New-Item -ItemType Directory -Path 'bin' -Force | Out-Null
+    New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
     Write-Host ('Building local CLI snapshot: {0}' -f $output)
     Invoke-Go -GoArguments @('build', '-trimpath', '-buildvcs=false', '-o', $output, './cmd/go-versioning')
 }

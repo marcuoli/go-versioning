@@ -12,7 +12,7 @@ This is an importable Go library with optional Git integration and a CLI.
 - Preserve public API compatibility and the separation between runtime metadata and Git discovery.
 
 ## Development
-- Use Go 1.27.3 and the standard library. Review any new dependency deliberately.
+- Use Go 1.27.4 for current builds; retain and test the Go 1.27.3 minimum. Use the standard library. Review any new dependency deliberately.
 - Finish one bounded issue before starting another; preserve existing behavior and unrelated work.
 - Before editing tracked files, inspect both working changes and committed content.
 - Use the shared validation scripts. Run meaningful regression tests, the full test suite,

@@ -1,6 +1,6 @@
 # Contributing
 
-Use Go 1.27.3 and an installed Git. The library uses only the standard library.
+Use Go 1.27.4 for development and an installed Git. The supported consumer minimum remains Go 1.27.3 and is tested separately. The library uses only the standard library.
 The root package is the normal application import; `gitversion` is optional
 repository integration, and `cmd/go-versioning` is the separate command tool.
 

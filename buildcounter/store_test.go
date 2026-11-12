@@ -21,7 +21,9 @@ func newStore(t *testing.T) (*Store, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return store, path
+	// Interrupted-header fixtures must use the physical path persisted by Open,
+	// including when the host temporary directory has a filesystem alias.
+	return store, store.path
 }
 func request(id string) Request { return Request{ID: id, Version: "0.0.0+unknown", Commit: testCommit} }
 

@@ -154,11 +154,23 @@ localization, packaging and release notes remain with the consuming application.
 
 ```sh
 bash scripts/validate.sh
+# Select an exact minimum compiler on PATH, then test consumer compatibility.
+bash scripts/validate.sh --go-version=1.27.3
 bash scripts/validate.sh --race
 ```
 
 On Windows use `./scripts/validate.ps1` and optionally `-Race` with an existing
-C compiler. Development scripts validate the effective Go 1.27.3 toolchain.
+C compiler. Current builds use Go 1.27.4; consumer compatibility remains Go 1.27.3.
+Select that exact compiler on PATH and pass `-GoVersion 1.27.3` for the minimum
+check. Scripts set `GOTOOLCHAIN=local` so automatic switching cannot hide which
+compiler ran. Both exact versions are tested in Gitea and the GitHub OS matrix.
+
+Build output defaults to the project's external V: build namespace on maintained
+Windows/WSL hosts, or the hosted runner's temporary build directory. Set
+`GO_VERSIONING_BUILD_DIR` (or PowerShell `-OutputDirectory`) for another external
+destination. Scope Go caches and temporary directories to the owning project's
+external storage before running tools. Historical Go 1.27.3 installation evidence
+remains unchanged.
 The default VS Code build task creates a local snapshot and does not publish.
 
 Licensed under [UPL 1.0](LICENSE).

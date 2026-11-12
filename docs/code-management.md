@@ -19,7 +19,8 @@ Areas: `area:versioning`, `area:git`, `area:cli`, `area:tooling`,
 `area:documentation`, `area:release`, `area:security`.
 
 ## Validation and builds
-Use Go 1.27.3 and the shared scripts for tests, vet, module verification and
+Use Go 1.27.4 for current builds and validate the exact Go 1.27.3 minimum separately.
+Use the shared scripts for tests, vet, module verification and
 CGO-disabled CLI builds. Run race tests with an existing C compiler when the
 affected behavior requires them. Keep compiler/cache settings process-scoped.
 Editor build tasks remain local and offline; publication is a deliberate

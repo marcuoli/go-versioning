@@ -30,7 +30,7 @@ The root API and optional Git API are public. Existing helpers remain private
 within their owning package. Introduce an `internal` package only when there
 is a concrete shared private responsibility, rather than scaffolding empty layers.
 
-Go 1.27.3 is the development and module baseline. Runtime packages use only the
+Go 1.27.3 is the supported module minimum; Go 1.27.4 is the current build compiler. Runtime packages use only the
 standard library, and distribution builds retain `CGO_ENABLED=0`.
 
 ## Build-time counter authority

@@ -9,7 +9,16 @@ import (
 	"testing"
 )
 
-func mainVersion(t *testing.T) string { t.Helper(); return filepath.Join(t.TempDir(), "VERSION") }
+func mainVersion(t *testing.T) string {
+	t.Helper()
+	// Hand-built owners and recovery receipts must match the canonical paths
+	// persisted by the API, including macOS's /var -> /private/var temp alias.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(root, "VERSION")
+}
 func TestRelocatePreservesHistoryAndResumes(t *testing.T) {
 	ctx := context.Background()
 	s, p := newStore(t)

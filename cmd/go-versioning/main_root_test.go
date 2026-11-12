@@ -96,8 +96,13 @@ func TestCounterRelocateCLIChangesNoReservation(t *testing.T) {
 	if e != nil || again != r {
 		t.Fatal(again, e)
 	}
+	// The CLI returns the physical path; the input can retain a host temp alias.
+	versionFile, e := filepath.EvalSymlinks(filepath.Join(main, "VERSION"))
+	if e != nil {
+		t.Fatal(e)
+	}
 	st, e := s.Status(context.Background())
-	if e != nil || st.LastNumber != 1 || st.TrackedAttempts != 1 || st.VersionFile != filepath.Join(main, "VERSION") {
+	if e != nil || st.LastNumber != 1 || st.TrackedAttempts != 1 || st.VersionFile != versionFile {
 		t.Fatal(st, e)
 	}
 }
